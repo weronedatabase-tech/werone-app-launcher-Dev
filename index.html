@@ -4,6 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>WERONE</title>
+
+    <!-- ========================================== -->
+    <!-- ⚙️ ENVIRONMENT CONFIGURATION               -->
+    <!-- ========================================== -->
+    <script>
+        const APP_ENV = "DEV"; // Change to "PROD" to switch back to Live Mode
+
+        const GAS_WEBAPP_URL_PROD = "https://script.google.com/macros/s/AKfycbyDQFQnmqmooqLSwKbhNxiK6nsJF0ywMZlvmPVbE0YQHhOM4G5vGCbSOQDIpC0WN3XU/exec";
+        const GAS_WEBAPP_URL_DEV = "https://script.google.com/macros/s/AKfycbw_WV5UIMt2A_0JnDuIDtjbUAWJFGBRPl-p_7uVP060ryqISRz0jaWSHJwNPC7h0Mw05A/exec";
+        
+        const GAS_WEBAPP_URL = APP_ENV === "PROD" ? GAS_WEBAPP_URL_PROD : GAS_WEBAPP_URL_DEV;
+    </script>
+    <!-- ========================================== -->
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- SortableJS for Drag and Drop -->
@@ -47,8 +61,8 @@
             
             <!-- Logo & Title Area -->
             <div class="flex items-center space-x-2 app-title-container">
-                <!-- If Google Drive blocks the image, the onerror triggers the sleek fallback logo -->
-                <img src="https://drive.google.com/uc?export=view&id=16inwGztkqL_i9OaSDNzQPQNPLEtGEPEH" alt="WERONE Logo" class="w-8 h-8 rounded-md object-contain" onerror="this.style.display='none'; document.getElementById('logo-fallback').classList.remove('hidden');">
+                <!-- Fetching the raw image directly from GitHub -->
+                <img src="https://raw.githubusercontent.com/weronedatabase-tech/werone-app-launcher/main/werone.jpg" alt="WERONE Logo" class="w-8 h-8 rounded-md object-cover" onerror="this.style.display='none'; document.getElementById('logo-fallback').classList.remove('hidden');">
                 <div id="logo-fallback" class="hidden w-8 h-8 bg-blue-600 dark:bg-blue-500 text-white rounded-md flex items-center justify-center font-bold text-lg shadow-sm">W</div>
                 
                 <h1 class="text-xl font-bold tracking-widest text-gray-800 dark:text-white">WERONE</h1>
@@ -95,7 +109,8 @@
                 <button onclick="UI.togglePasswordVisibility('admin-password')" class="absolute right-3 top-3.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-lg">👁️</button>
             </div>
             
-            <button onclick="App.login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-all shadow-md active:scale-95">
+            <!-- Bug Fix: Added id="login-btn" -->
+            <button id="login-btn" onclick="App.login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-all shadow-md active:scale-95">
                 Login
             </button>
         </div>
@@ -181,17 +196,6 @@
 
     <!-- Injecting Logic & PWA -->
     <script>
-        // ==========================================
-        // ENVIRONMENT CONFIGURATION
-        // ==========================================
-        const APP_ENV = "DEV"; // Change to "PROD" to switch back to Live Mode
-
-        const GAS_WEBAPP_URL_PROD = "https://script.google.com/macros/s/AKfycbyDQFQnmqmooqLSwKbhNxiK6nsJF0ywMZlvmPVbE0YQHhOM4G5vGCbSOQDIpC0WN3XU/exec";
-        const GAS_WEBAPP_URL_DEV = "https://script.google.com/macros/s/AKfycbw_WV5UIMt2A_0JnDuIDtjbUAWJFGBRPl-p_7uVP060ryqISRz0jaWSHJwNPC7h0Mw05A/exec";
-        
-        const GAS_WEBAPP_URL = APP_ENV === "PROD" ? GAS_WEBAPP_URL_PROD : GAS_WEBAPP_URL_DEV;
-        // ==========================================
-
         let sessionPassword = null;
         let appsData =[];
         let sortableInstance = null;
@@ -207,9 +211,9 @@
                 background_color: "#ffffff",
                 theme_color: "#4f46e5",
                 icons:[{
-                    src: "https://drive.google.com/uc?export=view&id=16inwGztkqL_i9OaSDNzQPQNPLEtGEPEH",
+                    src: "https://raw.githubusercontent.com/weronedatabase-tech/werone-app-launcher/main/werone.jpg",
                     sizes: "512x512",
-                    type: "image/png"
+                    type: "image/jpeg"
                 }]
             };
             const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
@@ -273,7 +277,7 @@
                 UI.showLauncher(true); // Shows loading spinner
                 try {
                     appsData = await API.request('getApps');
-                    UI.showLauncher(false); // <--- Bug Fix: This hides the spinner and shows the grid properly
+                    UI.showLauncher(false); 
                 } catch (err) {
                     document.getElementById('loading-indicator').innerHTML = `<span class="text-red-500 font-medium text-sm mt-4">Failed to load workspace.<br>${err.message}</span>`;
                 }
@@ -282,7 +286,9 @@
             async login() {
                 const passInput = document.getElementById('admin-password');
                 const alertBox = document.getElementById('auth-alert');
-                const btn = passInput.nextElementSibling.nextElementSibling; 
+                
+                // Bug Fix: Target the specific ID rather than relying on structural DOM traversal
+                const btn = document.getElementById('login-btn'); 
                 
                 try {
                     btn.innerHTML = `<svg class="animate-spin h-5 w-5 mx-auto text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
