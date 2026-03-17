@@ -278,7 +278,7 @@
             },
 
             async refreshData() {
-                UI.showLauncher(true); // Shows loading spinner
+                UI.showLauncher(true); 
                 try {
                     appsData = await API.request('getApps');
                     UI.showLauncher(false); 
@@ -476,28 +476,34 @@
                     let iconHtml = '';
                     const initial = app.Name ? app.Name.charAt(0).toUpperCase() : '?';
                     
-                    // The robust letter placeholder shape
+                    // Pre-generate the elegant fallback shape in case the image fails
                     const fallbackHtml = `<div class="w-16 h-16 md:w-20 md:h-20 rounded-2xl shadow-sm app-placeholder flex items-center justify-center text-3xl font-bold transition-transform group-hover:-translate-y-1">${initial}</div>`;
-                    
+                    const safeFallback = fallbackHtml.replace(/"/g, '&quot;');
+
                     if (app.IconURL && app.IconURL.length > 5) {
                         let finalUrl = app.IconURL;
-                        
-                        // FIX: Auto-rewrite Google Drive restriction links
+                        let errHandler = `this.outerHTML='${safeFallback}'`;
+
                         if (finalUrl.includes('drive.google.com')) {
+                            // Auto-Fix Google Drive links
                             const match = finalUrl.match(/id=([a-zA-Z0-9_-]+)/);
                             if (match && match[1]) {
                                 finalUrl = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w256`;
                             }
+                        } else if (finalUrl.startsWith('http')) {
+                            // The 3-Tier Self-Healing Image Router logic
+                            const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(finalUrl)}&w=256&output=webp`;
+                            errHandler = `if(!this.dataset.retried){this.dataset.retried='true'; this.src='${proxyUrl}';} else {this.outerHTML='${safeFallback}';}`;
                         }
 
-                        // FIX: Add a bulletproof 'onerror' so broken icons instantly turn into shapes
-                        const safeFallback = fallbackHtml.replace(/"/g, '&quot;');
-                        iconHtml = `<img src="${finalUrl}" alt="${app.Name}" class="w-16 h-16 md:w-20 md:h-20 object-contain rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 transition-transform group-hover:-translate-y-1" onerror="this.outerHTML='${safeFallback}'">`;
+                        // Apply the magic logic onto the image tag
+                        iconHtml = `<img src="${finalUrl}" alt="${app.Name}" referrerpolicy="no-referrer" class="w-16 h-16 md:w-20 md:h-20 object-contain rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 transition-transform group-hover:-translate-y-1" onerror="${errHandler}">`;
                     } else {
+                        // If no URL was provided at all, just use the shape immediately
                         iconHtml = fallbackHtml;
                     }
 
-                    // FIX: Replaced "truncate" with "line-clamp-2" so text wraps cleanly instead of cutting off
+                    // Replaced Truncate with "line-clamp-2 leading-tight" so long names wrap cleanly to 2 lines instead of cutting off immediately
                     el.innerHTML = `
                         ${iconHtml}
                         <span class="mt-3 text-xs md:text-sm font-medium text-center w-full px-1 line-clamp-2 leading-tight">${app.Name}</span>
