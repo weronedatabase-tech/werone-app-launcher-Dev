@@ -4,20 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>WERONE</title>
-
-    <!-- ========================================== -->
-    <!-- ⚙️ ENVIRONMENT CONFIGURATION               -->
-    <!-- ========================================== -->
-    <script>
-        const APP_ENV = "DEV"; // Change to "PROD" to switch back to Live Mode
-
-        const GAS_WEBAPP_URL_PROD = "https://script.google.com/macros/s/AKfycbyDQFQnmqmooqLSwKbhNxiK6nsJF0ywMZlvmPVbE0YQHhOM4G5vGCbSOQDIpC0WN3XU/exec";
-        const GAS_WEBAPP_URL_DEV = "https://script.google.com/macros/s/AKfycbw_WV5UIMt2A_0JnDuIDtjbUAWJFGBRPl-p_7uVP060ryqISRz0jaWSHJwNPC7h0Mw05A/exec";
-        
-        const GAS_WEBAPP_URL = APP_ENV === "PROD" ? GAS_WEBAPP_URL_PROD : GAS_WEBAPP_URL_DEV;
-    </script>
-    <!-- ========================================== -->
-
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- SortableJS for Drag and Drop -->
@@ -61,6 +47,7 @@
             
             <!-- Logo & Title Area -->
             <div class="flex items-center space-x-2 app-title-container">
+                <!-- Fetching the raw image directly from GitHub -->
                 <img src="https://raw.githubusercontent.com/weronedatabase-tech/werone-app-launcher/main/werone.jpg" alt="WERONE Logo" class="w-8 h-8 rounded-md object-cover" onerror="this.style.display='none'; document.getElementById('logo-fallback').classList.remove('hidden');">
                 <div id="logo-fallback" class="hidden w-8 h-8 bg-blue-600 dark:bg-blue-500 text-white rounded-md flex items-center justify-center font-bold text-lg shadow-sm">W</div>
                 
@@ -69,12 +56,14 @@
             
             <!-- Interactive Tools Area -->
             <div class="flex items-center space-x-1">
+                <!-- Modern Minimal Settings Icon -->
                 <button onclick="UI.showSettingsAuth()" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-all focus:outline-none" title="Settings">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
                       <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                     </svg>
                 </button>
+                
                 <button onclick="UI.toggleTheme()" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-all text-xl" title="Toggle Light/Dark">
                     🌗
                 </button>
@@ -103,18 +92,10 @@
 
             <div class="relative mb-6">
                 <input type="password" id="admin-password" placeholder="Enter Password" class="w-full p-3 pr-12 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white" onkeypress="if(event.key === 'Enter') App.login()">
-                <button onclick="UI.togglePasswordVisibility('admin-password')" class="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-none" title="Show/Hide Password">
-                    <svg id="icon-eye" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                    </svg>
-                    <svg id="icon-eye-slash" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 hidden">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
-                    </svg>
-                </button>
+                <button onclick="UI.togglePasswordVisibility('admin-password')" class="absolute right-3 top-3.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-lg">👁️</button>
             </div>
             
-            <button id="login-btn" onclick="App.login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-all shadow-md active:scale-95">
+            <button onclick="App.login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-all shadow-md active:scale-95">
                 Login
             </button>
         </div>
@@ -200,6 +181,17 @@
 
     <!-- Injecting Logic & PWA -->
     <script>
+        // ==========================================
+        // ENVIRONMENT CONFIGURATION
+        // ==========================================
+        const APP_ENV = "DEV"; // Change to "PROD" to switch back to Live Mode
+
+        const GAS_WEBAPP_URL_PROD = "https://script.google.com/macros/s/AKfycbyDQFQnmqmooqLSwKbhNxiK6nsJF0ywMZlvmPVbE0YQHhOM4G5vGCbSOQDIpC0WN3XU/exec";
+        const GAS_WEBAPP_URL_DEV = "https://script.google.com/macros/s/AKfycbw_WV5UIMt2A_0JnDuIDtjbUAWJFGBRPl-p_7uVP060ryqISRz0jaWSHJwNPC7h0Mw05A/exec";
+        
+        const GAS_WEBAPP_URL = APP_ENV === "PROD" ? GAS_WEBAPP_URL_PROD : GAS_WEBAPP_URL_DEV;
+        // ==========================================
+
         let sessionPassword = null;
         let appsData =[];
         let sortableInstance = null;
@@ -210,29 +202,18 @@
             const manifest = {
                 name: "WERONE",
                 short_name: "WERONE",
-                start_url: "./",
+                start_url: location.href,
                 display: "standalone",
                 background_color: "#ffffff",
                 theme_color: "#4f46e5",
-                icons:[
-                    {
-                        src: "https://raw.githubusercontent.com/weronedatabase-tech/werone-app-launcher/main/werone.jpg",
-                        sizes: "192x192",
-                        type: "image/jpeg",
-                        purpose: "any maskable"
-                    },
-                    {
-                        src: "https://raw.githubusercontent.com/weronedatabase-tech/werone-app-launcher/main/werone.jpg",
-                        sizes: "512x512",
-                        type: "image/jpeg",
-                        purpose: "any maskable"
-                    }
-                ]
+                icons:[{
+                    src: "https://raw.githubusercontent.com/weronedatabase-tech/werone-app-launcher/main/werone.jpg",
+                    sizes: "512x512",
+                    type: "image/jpeg"
+                }]
             };
-            
-            // Bug Fix: Using a valid Data URI instead of a Blob to fulfill strict installation requirements
-            const manifestData = "data:application/json;charset=utf-8," + encodeURIComponent(JSON.stringify(manifest));
-            document.head.insertAdjacentHTML('beforeend', `<link rel="manifest" href="${manifestData}">`);
+            const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+            document.head.insertAdjacentHTML('beforeend', `<link rel="manifest" href="${URL.createObjectURL(manifestBlob)}">`);
 
             const swCode = `
                 self.addEventListener('install', e => self.skipWaiting());
@@ -268,12 +249,6 @@
                     });
                     
                     const result = await response.json();
-                    
-                    if (action === 'verifyPassword') {
-                        if (result.success === true) return true;
-                        throw new Error("Incorrect Password");
-                    }
-                    
                     if (!result.success) throw new Error(result.error || "Server action failed.");
                     return result.data;
                 } catch (err) {
@@ -295,7 +270,7 @@
             },
 
             async refreshData() {
-                UI.showLauncher(true); 
+                UI.showLauncher(true); // Shows loading spinner
                 try {
                     appsData = await API.request('getApps');
                     UI.showLauncher(false); 
@@ -307,7 +282,7 @@
             async login() {
                 const passInput = document.getElementById('admin-password');
                 const alertBox = document.getElementById('auth-alert');
-                const btn = document.getElementById('login-btn'); 
+                const btn = passInput.nextElementSibling.nextElementSibling; 
                 
                 try {
                     btn.innerHTML = `<svg class="animate-spin h-5 w-5 mx-auto text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
@@ -316,15 +291,10 @@
                     if (isValid) {
                         sessionPassword = passInput.value;
                         passInput.value = '';
-                        
-                        const iconEye = document.getElementById('icon-eye');
-                        const iconEyeSlash = document.getElementById('icon-eye-slash');
-                        passInput.type = 'password';
-                        if (iconEye) iconEye.classList.remove('hidden');
-                        if (iconEyeSlash) iconEyeSlash.classList.add('hidden');
-                        
                         alertBox.classList.add('hidden');
                         UI.showSettingsDashboard();
+                    } else {
+                        throw new Error("Incorrect Password");
                     }
                 } catch (err) {
                     alertBox.textContent = err.message;
@@ -448,18 +418,7 @@
 
             togglePasswordVisibility(id) {
                 const input = document.getElementById(id);
-                const iconEye = document.getElementById('icon-eye');
-                const iconEyeSlash = document.getElementById('icon-eye-slash');
-                
-                if (input.type === 'password') {
-                    input.type = 'text';
-                    if (iconEye) iconEye.classList.add('hidden');
-                    if (iconEyeSlash) iconEyeSlash.classList.remove('hidden');
-                } else {
-                    input.type = 'password';
-                    if (iconEye) iconEye.classList.remove('hidden');
-                    if (iconEyeSlash) iconEyeSlash.classList.add('hidden');
-                }
+                input.type = input.type === 'password' ? 'text' : 'password';
             },
 
             showLauncher(loading = false) {
@@ -509,33 +468,16 @@
                     el.className = "flex flex-col items-center group cursor-pointer active:scale-95 transition-transform";
                     
                     let iconHtml = '';
-                    const initial = app.Name ? app.Name.charAt(0).toUpperCase() : '?';
-                    
-                    const fallbackHtml = `<div class="w-16 h-16 md:w-20 md:h-20 rounded-2xl shadow-sm app-placeholder flex items-center justify-center text-3xl font-bold transition-transform group-hover:-translate-y-1">${initial}</div>`;
-                    const safeFallback = fallbackHtml.replace(/"/g, '&quot;');
-
                     if (app.IconURL && app.IconURL.length > 5) {
-                        let finalUrl = app.IconURL;
-                        let errHandler = `this.outerHTML='${safeFallback}'`;
-
-                        if (finalUrl.includes('drive.google.com')) {
-                            const match = finalUrl.match(/id=([a-zA-Z0-9_-]+)/);
-                            if (match && match[1]) {
-                                finalUrl = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w256`;
-                            }
-                        } else if (finalUrl.startsWith('http')) {
-                            const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(finalUrl)}&w=256&output=webp`;
-                            errHandler = `if(!this.dataset.retried){this.dataset.retried='true'; this.src='${proxyUrl}';} else {this.outerHTML='${safeFallback}';}`;
-                        }
-
-                        iconHtml = `<img src="${finalUrl}" alt="${app.Name}" referrerpolicy="no-referrer" class="w-16 h-16 md:w-20 md:h-20 object-contain rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 transition-transform group-hover:-translate-y-1" onerror="${errHandler}">`;
+                        iconHtml = `<img src="${app.IconURL}" alt="${app.Name}" class="w-16 h-16 md:w-20 md:h-20 object-contain rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 transition-transform group-hover:-translate-y-1">`;
                     } else {
-                        iconHtml = fallbackHtml;
+                        const initial = app.Name ? app.Name.charAt(0).toUpperCase() : '?';
+                        iconHtml = `<div class="w-16 h-16 md:w-20 md:h-20 rounded-2xl shadow-sm app-placeholder flex items-center justify-center text-3xl font-bold transition-transform group-hover:-translate-y-1">${initial}</div>`;
                     }
 
                     el.innerHTML = `
                         ${iconHtml}
-                        <span class="mt-3 text-xs md:text-sm font-medium text-center w-full px-1 line-clamp-2 leading-tight">${app.Name}</span>
+                        <span class="mt-3 text-sm font-medium text-center truncate w-full px-2">${app.Name}</span>
                     `;
                     grid.appendChild(el);
                 });
