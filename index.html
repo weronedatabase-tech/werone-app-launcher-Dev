@@ -61,7 +61,6 @@
             
             <!-- Logo & Title Area -->
             <div class="flex items-center space-x-2 app-title-container">
-                <!-- Fetching the raw image directly from GitHub -->
                 <img src="https://raw.githubusercontent.com/weronedatabase-tech/werone-app-launcher/main/werone.jpg" alt="WERONE Logo" class="w-8 h-8 rounded-md object-cover" onerror="this.style.display='none'; document.getElementById('logo-fallback').classList.remove('hidden');">
                 <div id="logo-fallback" class="hidden w-8 h-8 bg-blue-600 dark:bg-blue-500 text-white rounded-md flex items-center justify-center font-bold text-lg shadow-sm">W</div>
                 
@@ -253,12 +252,10 @@
                     
                     const result = await response.json();
                     
-                    // --- BUG FIX: Safely handles the password validation response ---
                     if (action === 'verifyPassword') {
                         if (result.success === true) return true;
                         throw new Error("Incorrect Password");
                     }
-                    // ----------------------------------------------------------------
                     
                     if (!result.success) throw new Error(result.error || "Server action failed.");
                     return result.data;
@@ -477,16 +474,33 @@
                     el.className = "flex flex-col items-center group cursor-pointer active:scale-95 transition-transform";
                     
                     let iconHtml = '';
+                    const initial = app.Name ? app.Name.charAt(0).toUpperCase() : '?';
+                    
+                    // The robust letter placeholder shape
+                    const fallbackHtml = `<div class="w-16 h-16 md:w-20 md:h-20 rounded-2xl shadow-sm app-placeholder flex items-center justify-center text-3xl font-bold transition-transform group-hover:-translate-y-1">${initial}</div>`;
+                    
                     if (app.IconURL && app.IconURL.length > 5) {
-                        iconHtml = `<img src="${app.IconURL}" alt="${app.Name}" class="w-16 h-16 md:w-20 md:h-20 object-contain rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 transition-transform group-hover:-translate-y-1">`;
+                        let finalUrl = app.IconURL;
+                        
+                        // FIX: Auto-rewrite Google Drive restriction links
+                        if (finalUrl.includes('drive.google.com')) {
+                            const match = finalUrl.match(/id=([a-zA-Z0-9_-]+)/);
+                            if (match && match[1]) {
+                                finalUrl = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w256`;
+                            }
+                        }
+
+                        // FIX: Add a bulletproof 'onerror' so broken icons instantly turn into shapes
+                        const safeFallback = fallbackHtml.replace(/"/g, '&quot;');
+                        iconHtml = `<img src="${finalUrl}" alt="${app.Name}" class="w-16 h-16 md:w-20 md:h-20 object-contain rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 transition-transform group-hover:-translate-y-1" onerror="this.outerHTML='${safeFallback}'">`;
                     } else {
-                        const initial = app.Name ? app.Name.charAt(0).toUpperCase() : '?';
-                        iconHtml = `<div class="w-16 h-16 md:w-20 md:h-20 rounded-2xl shadow-sm app-placeholder flex items-center justify-center text-3xl font-bold transition-transform group-hover:-translate-y-1">${initial}</div>`;
+                        iconHtml = fallbackHtml;
                     }
 
+                    // FIX: Replaced "truncate" with "line-clamp-2" so text wraps cleanly instead of cutting off
                     el.innerHTML = `
                         ${iconHtml}
-                        <span class="mt-3 text-sm font-medium text-center truncate w-full px-2">${app.Name}</span>
+                        <span class="mt-3 text-xs md:text-sm font-medium text-center w-full px-1 line-clamp-2 leading-tight">${app.Name}</span>
                     `;
                     grid.appendChild(el);
                 });
