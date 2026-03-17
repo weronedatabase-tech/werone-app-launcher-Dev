@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>WERONE</title>
+    
+    <!-- Link to the physical manifest file -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+    <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/weronedatabase-tech/werone-app-launcher/main/werone.jpg">
 
     <!-- ========================================== -->
     <!-- ⚙️ ENVIRONMENT CONFIGURATION               -->
@@ -26,7 +31,6 @@
         tailwind.config = { darkMode: 'class' }
     </script>
     <style>
-        /* Modern minimal transitions and custom scrollbars */
         body { -webkit-tap-highlight-color: transparent; }
         .transition-all { transition-property: all; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 300ms; }
         .drag-handle { cursor: grab; }
@@ -36,7 +40,6 @@
         .hide-scroll::-webkit-scrollbar { display: none; }
         .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
         
-        /* Elegant Placeholder Pattern */
         .app-placeholder {
             background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
             color: #4f46e5;
@@ -58,16 +61,12 @@
         
         <!-- Navbar -->
         <header class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm w-full transition-all">
-            
-            <!-- Logo & Title Area -->
             <div class="flex items-center space-x-2 app-title-container">
                 <img src="https://raw.githubusercontent.com/weronedatabase-tech/werone-app-launcher/main/werone.jpg" alt="WERONE Logo" class="w-8 h-8 rounded-md object-cover" onerror="this.style.display='none'; document.getElementById('logo-fallback').classList.remove('hidden');">
                 <div id="logo-fallback" class="hidden w-8 h-8 bg-blue-600 dark:bg-blue-500 text-white rounded-md flex items-center justify-center font-bold text-lg shadow-sm">W</div>
-                
                 <h1 class="text-xl font-bold tracking-widest text-gray-800 dark:text-white">WERONE</h1>
             </div>
             
-            <!-- Interactive Tools Area -->
             <div class="flex items-center space-x-1">
                 <button onclick="UI.showSettingsAuth()" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-all focus:outline-none" title="Settings">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
@@ -89,7 +88,6 @@
             Loading your workspace...
         </div>
         <div id="apps-grid" class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6 max-w-5xl mx-auto hidden">
-            <!-- Dynamic Apps Render Here -->
         </div>
     </main>
 
@@ -134,11 +132,9 @@
                     </button>
                 </div>
             </div>
-            
             <div class="p-4 flex-grow overflow-y-auto hide-scroll">
                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-4 uppercase tracking-wider font-semibold">Drag ≡ to reorder apps</p>
                 <div id="settings-app-list" class="space-y-3">
-                    <!-- Dynamic List Items Render Here -->
                 </div>
             </div>
         </div>
@@ -169,19 +165,15 @@
 
                 <div>
                     <label class="block text-sm font-medium mb-1">App Icon</label>
-                    
-                    <!-- Icon Type Tabs -->
                     <div class="flex border-b border-gray-200 dark:border-gray-700 mb-3">
                         <button onclick="UI.setModalIconMode('url')" id="tab-url" class="flex-1 py-2 text-sm border-b-2 border-blue-600 text-blue-600 dark:text-blue-400 font-semibold transition-all">Link URL</button>
                         <button onclick="UI.setModalIconMode('upload')" id="tab-upload" class="flex-1 py-2 text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-semibold transition-all">Upload File</button>
                     </div>
 
-                    <!-- URL Input -->
                     <div id="icon-url-container">
                         <input type="url" id="modal-app-iconurl" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white" placeholder="https://... (Optional)">
                     </div>
 
-                    <!-- Upload Input -->
                     <div id="icon-upload-container" class="hidden">
                         <input type="file" id="modal-app-iconfile" accept="image/*" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900/30 dark:file:text-blue-400">
                         <p class="text-xs text-gray-500 mt-2">*Image will be saved to secure Drive folder</p>
@@ -205,48 +197,12 @@
         let sortableInstance = null;
         let isUploading = false;
 
-        // Dynamic PWA Injection
-        const initPWA = () => {
-            const manifest = {
-                name: "WERONE",
-                short_name: "WERONE",
-                start_url: "./",
-                display: "standalone",
-                background_color: "#ffffff",
-                theme_color: "#4f46e5",
-                icons:[
-                    {
-                        src: "https://raw.githubusercontent.com/weronedatabase-tech/werone-app-launcher/main/werone.jpg",
-                        sizes: "192x192",
-                        type: "image/jpeg",
-                        purpose: "any maskable"
-                    },
-                    {
-                        src: "https://raw.githubusercontent.com/weronedatabase-tech/werone-app-launcher/main/werone.jpg",
-                        sizes: "512x512",
-                        type: "image/jpeg",
-                        purpose: "any maskable"
-                    }
-                ]
-            };
-            
-            // Bug Fix: Using a valid Data URI instead of a Blob to fulfill strict installation requirements
-            const manifestData = "data:application/json;charset=utf-8," + encodeURIComponent(JSON.stringify(manifest));
-            document.head.insertAdjacentHTML('beforeend', `<link rel="manifest" href="${manifestData}">`);
-
-            const swCode = `
-                self.addEventListener('install', e => self.skipWaiting());
-                self.addEventListener('activate', e => self.clients.claim());
-                self.addEventListener('fetch', e => {
-                    if (e.request.method !== 'GET') return;
-                    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
-                });
-            `;
-            const swBlob = new Blob([swCode], {type: 'application/javascript'});
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(err => console.log('SW Registration failed', err));
-            }
-        };
+        // Register the physical Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+                .then(() => console.log("Service Worker Registered Natively"))
+                .catch(err => console.error("SW Registration Failed:", err));
+        }
 
         // Network Layer
         const API = {
@@ -288,7 +244,6 @@
         // Application Logic
         const App = {
             async init() {
-                initPWA();
                 UI.initTheme();
                 UI.renderEnvBadge();
                 await this.refreshData();
