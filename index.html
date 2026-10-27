@@ -1,357 +1,855 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full antialiased">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>WERONE</title>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+    <title>WERONE Workspace Launcher</title>
+    <meta name="description" content="Enterprise WebApp Hub & Icon Studio with Google Apps Script synchronization, custom icon compositing, and drag-and-drop workspace management.">
+    <meta property="og:title" content="WERONE Workspace Launcher">
+    <meta property="og:description" content="Enterprise WebApp Hub & Icon Studio with Google Apps Script synchronization, custom icon compositing, and drag-and-drop workspace management.">
     <meta name="theme-color" content="#000000">
-    <!-- Uses the local repo icon for Apple devices -->
+
+    <!-- Apple Touch Icon -->
     <link rel="apple-touch-icon" href="./icon-192.png">
+    <link rel="icon" type="image/png" href="./icon-192.png">
+
+    <!-- Fonts & Upstream Preconnects -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://script.google.com">
+    <link rel="preconnect" href="https://lh3.googleusercontent.com" crossorigin>
+    <link rel="dns-prefetch" href="https://drive.google.com">
+    <link rel="dns-prefetch" href="https://wsrv.nl">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <!-- ========================================== -->
-    <!-- ⚙️ ENVIRONMENT CONFIGURATION               -->
+    <!-- CENTRALIZED ENVIRONMENT CONFIGURATION      -->
     <!-- ========================================== -->
+    <script src="./backend/config.js"></script>
     <script>
-        const APP_ENV = "DEV"; // Change to "PROD" to switch back to Live Mode
+        // Zero-FOUC Theme Initialization before first paint
+        (function() {
+            try {
+                const isDark = localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                document.documentElement.classList.toggle('dark', isDark);
+            } catch (_) {}
+        })();
 
-        const GAS_WEBAPP_URL_PROD = "https://script.google.com/macros/s/AKfycbyDQFQnmqmooqLSwKbhNxiK6nsJF0ywMZlvmPVbE0YQHhOM4G5vGCbSOQDIpC0WN3XU/exec";
-        const GAS_WEBAPP_URL_DEV = "https://script.google.com/macros/s/AKfycbw_WV5UIMt2A_0JnDuIDtjbUAWJFGBRPl-p_7uVP060ryqISRz0jaWSHJwNPC7h0Mw05A/exec";
-        
-        const GAS_WEBAPP_URL = APP_ENV === "PROD" ? GAS_WEBAPP_URL_PROD : GAS_WEBAPP_URL_DEV;
-
-        // Dynamically build the PWA manifest to switch App Names based on Env
+        // Dynamically build the PWA manifest from /backend/config.js
         const manifest = {
-            name: "WERONE" + (APP_ENV === "DEV" ? " (Dev)" : ""),
-            short_name: "WERONE" + (APP_ENV === "DEV" ? " Dev" : ""),
+            name: window.WERONE_CONFIG.APP_NAME,
+            short_name: window.WERONE_CONFIG.SHORT_NAME,
             start_url: "./",
             display: "standalone",
-            background_color: "#ffffff",
+            background_color: "#000000",
             theme_color: "#000000",
-            icons:[
+            icons: [
                 { src: "./icon-192.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
                 { src: "./icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" }
             ]
         };
-        
+
         const manifestData = "data:application/json;charset=utf-8," + encodeURIComponent(JSON.stringify(manifest));
         document.head.insertAdjacentHTML('beforeend', `<link rel="manifest" href="${manifestData}">`);
+        document.title = window.WERONE_CONFIG.APP_NAME;
     </script>
-    <!-- ========================================== -->
 
-    <!-- Tailwind CSS -->
+    <!-- Tailwind CSS & Deferred SortableJS (only needed in Directory Manager) -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- SortableJS for Drag and Drop -->
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script>
-        tailwind.config = { darkMode: 'class' }
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        display: ['Outfit', 'sans-serif'],
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    },
+                    colors: {
+                        canvas: {
+                            light: '#F9FAFB',
+                            dark: '#000000'
+                        },
+                        surface: {
+                            light: '#FFFFFF',
+                            dark: '#111111',
+                            elevated: '#1A1A1A'
+                        }
+                    }
+                }
+            }
+        }
     </script>
     <style>
-        body { -webkit-tap-highlight-color: transparent; }
-        .transition-all { transition-property: all; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 300ms; }
-        .drag-handle { cursor: grab; }
-        .drag-handle:active { cursor: grabbing; }
-        .sortable-ghost { opacity: 0.4; background-color: #f3f4f6; }
-        .dark .sortable-ghost { background-color: #111111; }
-        .hide-scroll::-webkit-scrollbar { display: none; }
-        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
-        
-        .app-placeholder {
-            background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
-            color: #4f46e5;
+        body {
+            -webkit-tap-highlight-color: transparent;
+            font-feature-settings: "cv02", "cv03", "cv04", "cv11";
         }
-        .dark .app-placeholder {
-            background: linear-gradient(135deg, #3730a3 0%, #312e81 100%);
-            color: #a5b4fc;
+        .tabular-nums {
+            font-variant-numeric: tabular-nums;
+        }
+        .drag-handle {
+            cursor: grab;
+            touch-action: none;
+        }
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+        .sortable-ghost {
+            opacity: 0.35;
+            background-color: rgba(161, 161, 170, 0.12) !important;
+            border-color: rgba(161, 161, 170, 0.4) !important;
+        }
+        .sortable-drag {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.35), 0 8px 10px -6px rgba(0, 0, 0, 0.2) !important;
+        }
+        .hide-scroll::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scroll {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .checkerboard-canvas {
+            background-image: repeating-conic-gradient(#e4e4e7 0% 25%, #fafafa 0% 50%);
+            background-size: 16px 16px;
+        }
+        .dark .checkerboard-canvas {
+            background-image: repeating-conic-gradient(#1f1f22 0% 25%, #0a0a0a 0% 50%);
+            background-size: 16px 16px;
+        }
+        .app-initial-tile {
+            background: linear-gradient(135deg, #F4F4F5 0%, #E4E4E7 100%);
+            color: #18181B;
+        }
+        .dark .app-initial-tile {
+            background: linear-gradient(135deg, #1F1F22 0%, #121214 100%);
+            color: #F4F4F5;
+        }
+        @keyframes pulse-subtle {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.45; }
+        }
+        .skeleton-pulse {
+            animation: pulse-subtle 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        /* Smooth custom range sliders */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            height: 6px;
+            border-radius: 999px;
+            background: rgba(161, 161, 170, 0.28);
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #2563EB;
+            cursor: pointer;
+            margin-top: -6px;
+            border: 2px solid #FFFFFF;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.12);
+        }
+        .app-card-contain {
+            content-visibility: auto;
+            contain-intrinsic-size: 0 112px;
+        }
+        .app-row-contain {
+            content-visibility: auto;
+            contain-intrinsic-size: 0 56px;
         }
     </style>
 </head>
-<body class="bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 min-h-screen transition-all select-none font-sans flex flex-col">
+<body class="bg-canvas-light dark:bg-canvas-dark text-zinc-900 dark:text-zinc-100 min-h-screen flex flex-col font-sans selection:bg-blue-600 selection:text-white pb-16 md:pb-6 transition-colors duration-150">
 
-    <!-- Persistent Top Container -->
-    <div class="sticky top-0 z-20 w-full flex flex-col">
-        <!-- Dev Mode Persistent Bar -->
-        <div id="dev-mode-bar" class="hidden bg-red-600 text-white text-center text-[11px] font-bold py-1 uppercase tracking-[0.2em] shadow-md w-full">
-            Dev Mode
+    <!-- ========================================== -->
+    <!-- PERSISTENT TOP CONTAINER (DEV BANNER + NAV)-->
+    <!-- ========================================== -->
+    <div class="sticky top-0 z-30 w-full flex flex-col">
+        <!-- Top Red DEV Banner (Controlled strictly via /backend/config.js) -->
+        <div id="dev-mode-bar" class="hidden bg-red-600 text-white text-center text-xs font-extrabold leading-none py-0.5 uppercase tracking-[0.25em] shadow-sm w-full select-none">
+            DEV
         </div>
-        
-        <!-- Navbar -->
-        <header class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-[#1a1a1a] bg-white dark:bg-black shadow-sm w-full transition-all">
-            <div class="flex items-center space-x-2 app-title-container">
-                <!-- Universally fetches the local repo icon -->
-                <img src="./icon-192.png" alt="WERONE Logo" class="w-8 h-8 rounded-md object-cover" onerror="this.style.display='none'; document.getElementById('logo-fallback').classList.remove('hidden');">
-                <div id="logo-fallback" class="hidden w-8 h-8 bg-blue-600 dark:bg-blue-500 text-white rounded-md flex items-center justify-center font-bold text-lg shadow-sm">W</div>
-                <h1 class="text-xl font-bold tracking-widest text-gray-800 dark:text-white">WERONE</h1>
-            </div>
-            
-            <div class="flex items-center space-x-1">
-                <button onclick="UI.showSettingsAuth()" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-[#222] text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-all focus:outline-none" title="Settings">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+
+        <!-- Top Bar -->
+        <header class="h-12 md:h-14 bg-white/95 dark:bg-black/95 backdrop-blur-md border-b border-zinc-200 dark:border-[#1f1f1f] px-3 sm:px-5 lg:px-8 flex items-center justify-between gap-4 w-full">
+            <!-- Brand Zone -->
+            <a href="#launcher" onclick="event.preventDefault(); UI.showLauncher(false);" class="flex items-center gap-2 font-display text-base md:text-lg font-bold tracking-widest text-zinc-900 dark:text-white whitespace-nowrap shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded">
+                <img src="./icon-192.png" alt="WERONE Icon" referrerpolicy="no-referrer" class="w-6 h-6 rounded-md object-cover border border-zinc-200 dark:border-[#2a2a2a] shrink-0" onerror="this.style.display='none'; document.getElementById('brand-fallback-icon').classList.remove('hidden');">
+                <span id="brand-fallback-icon" class="hidden w-6 h-6 rounded-md bg-zinc-900 dark:bg-white text-white dark:text-black font-display font-bold text-xs items-center justify-center shrink-0">W</span>
+                <span>WERONE</span>
+            </a>
+
+            <!-- Navigation Links -->
+            <nav class="hidden md:flex items-center gap-6 text-xs font-medium text-zinc-500 dark:text-zinc-400" aria-label="Main Navigation">
+                <button type="button" id="nav-link-launcher" onclick="UI.showLauncher(false)" class="hover:text-zinc-900 dark:hover:text-white transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 border-zinc-900 dark:border-white text-zinc-900 dark:text-white font-semibold">
+                    Workspace
+                </button>
+                <button type="button" id="nav-link-manage" onclick="UI.showSettingsAuth()" class="hover:text-zinc-900 dark:hover:text-white transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 border-transparent">
+                    Directory Manager
+                </button>
+                <button type="button" id="nav-link-sync" onclick="App.refreshData(true)" class="hover:text-zinc-900 dark:hover:text-white transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 border-transparent">
+                    Sync Registry
+                </button>
+            </nav>
+
+            <!-- Top-Right Controls: Settings Gear Icon + Original 🌗 Light/Dark Toggle -->
+            <div class="flex items-center space-x-1 shrink-0">
+                <button
+                    type="button"
+                    id="header-settings-btn"
+                    onclick="UI.showSettingsAuth()"
+                    class="min-h-[38px] min-w-[38px] p-1.5 rounded-full hover:bg-zinc-100 dark:hover:bg-[#1f1f1f] text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-all flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    title="Settings"
+                    aria-label="Settings"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                     </svg>
                 </button>
-                <button onclick="UI.toggleTheme()" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-[#222] transition-all text-xl" title="Toggle Light/Dark">
+                <button
+                    type="button"
+                    onclick="UI.toggleTheme()"
+                    class="min-h-[38px] min-w-[38px] p-1.5 rounded-full hover:bg-zinc-100 dark:hover:bg-[#1f1f1f] transition-all text-lg flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    title="Toggle Light/Dark"
+                    aria-label="Toggle Light/Dark"
+                >
                     🌗
                 </button>
             </div>
         </header>
     </div>
 
-    <!-- Main App Launcher View -->
-    <main id="view-launcher" class="flex-grow p-6 hide-scroll overflow-y-auto">
-        <div id="loading-indicator" class="text-center text-gray-500 mt-10 flex flex-col items-center">
-            <svg class="animate-spin h-8 w-8 mb-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-            Loading your workspace...
-        </div>
-        <div id="apps-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-6 max-w-5xl mx-auto hidden">
-        </div>
-    </main>
+    <!-- ========================================== -->
+    <!-- COMPACT WORKSPACE CONTEXT & SEARCH TOOLBAR -->
+    <!-- ========================================== -->
+    <section id="workspace-toolbar" class="w-full max-w-7xl mx-auto px-3 sm:px-5 lg:px-8 pt-2.5 pb-2">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 pb-2.5 border-b border-zinc-200 dark:border-[#1f1f1f]">
+            <!-- Left: Title & Clean Unboxed Metadata -->
+            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                <h1 id="page-heading" class="font-display text-base sm:text-lg font-bold tracking-tight text-zinc-900 dark:text-white">
+                    Application Directory
+                </h1>
+                <div class="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-zinc-500 dark:text-zinc-400 tabular-nums">
+                    <span id="meta-app-count">0 Applications</span>
+                    <span aria-hidden="true">·</span>
+                    <span id="meta-sync-status">Ready</span>
+                </div>
+            </div>
 
-    <!-- Settings Auth View -->
-    <main id="view-auth" class="flex-grow flex items-center justify-center p-6 hidden">
-        <div class="bg-white dark:bg-[#111] p-8 rounded-2xl shadow-xl max-w-sm w-full relative">
-            <button onclick="UI.showLauncher()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 dark:hover:text-white text-xl">✕</button>
-            <h2 class="text-2xl font-bold mb-6 text-center flex justify-center items-center">Admin Access</h2>
-            
-            <div id="auth-alert" class="hidden mb-4 p-3 bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 rounded-lg text-sm text-center font-medium"></div>
+            <!-- Right: Search Bar & Icon Layout Toggle (Always Same Row) -->
+            <div id="launcher-controls-row" class="flex items-center gap-2 w-full sm:w-auto">
+                <!-- Search Input -->
+                <div id="launcher-search-box" class="relative flex-grow sm:w-56 md:w-64">
+                    <svg class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                    <input
+                        type="search"
+                        id="app-search-input"
+                        oninput="UI.handleSearch(this.value)"
+                        placeholder="Filter applications... (/)"
+                        aria-label="Filter applications"
+                        class="w-full min-h-[36px] pl-8 pr-7 py-1.5 text-xs bg-white dark:bg-[#111111] border border-zinc-200 dark:border-[#262626] rounded-lg text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    >
+                    <button
+                        type="button"
+                        id="search-clear-btn"
+                        onclick="UI.clearSearch()"
+                        title="Clear filter"
+                        class="hidden absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 text-xs"
+                    >
+                        ✕
+                    </button>
+                </div>
 
-            <div class="relative mb-6">
-                <input type="password" id="admin-password" placeholder="Enter Password" class="w-full p-3 pr-12 border border-gray-300 dark:border-[#333] rounded-lg bg-gray-50 dark:bg-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white" onkeypress="if(event.key === 'Enter') App.login()">
-                <button onclick="UI.togglePasswordVisibility('admin-password')" class="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-none" title="Show/Hide Password">
-                    <svg id="icon-eye" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                    </svg>
-                    <svg id="icon-eye-slash" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 hidden">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
-                    </svg>
+                <!-- View Mode Segmented Control (Icon Toggle: Grid vs Directory) -->
+                <div id="launcher-layout-toggle" class="flex items-center p-0.5 bg-zinc-200/70 dark:bg-[#111111] border border-zinc-200/80 dark:border-[#262626] rounded-lg shrink-0" role="group" aria-label="Layout Mode">
+                    <button
+                        type="button"
+                        id="layout-btn-grid"
+                        onclick="UI.setLayoutMode('grid')"
+                        title="Grid View"
+                        aria-label="Grid View"
+                        class="min-h-[32px] min-w-[34px] p-1 rounded-md transition-all flex items-center justify-center shrink-0 bg-white dark:bg-[#222222] text-zinc-900 dark:text-white shadow-sm"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+                        </svg>
+                    </button>
+                    <button
+                        type="button"
+                        id="layout-btn-list"
+                        onclick="UI.setLayoutMode('list')"
+                        title="Directory View"
+                        aria-label="Directory View"
+                        class="min-h-[32px] min-w-[34px] p-1 rounded-md transition-all flex items-center justify-center shrink-0 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- VIEW 1: MAIN APPLICATION LAUNCHER          -->
+    <!-- ========================================== -->
+    <main id="view-launcher" class="flex-grow w-full max-w-7xl mx-auto px-3 sm:px-5 lg:px-8 py-2">
+        <!-- Skeleton Loading Grid -->
+        <div id="loading-indicator" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2.5 sm:gap-3.5 hidden" aria-live="polite" aria-busy="true">
+            <!-- Populated dynamically with clean geometry-matched skeletons -->
+        </div>
+
+        <!-- Network Error / Offline State Banner -->
+        <div id="launcher-error-state" class="hidden max-w-md mx-auto my-8 p-5 bg-white dark:bg-[#111111] border border-zinc-200 dark:border-[#262626] rounded-xl text-center space-y-3">
+            <div class="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900/60 text-red-600 dark:text-red-400 flex items-center justify-center mx-auto">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"></path>
+                </svg>
+            </div>
+            <div class="space-y-1">
+                <h2 class="font-display text-base font-semibold text-zinc-900 dark:text-white">Workspace Unreachable</h2>
+                <p id="launcher-error-message" class="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed break-words">Unable to retrieve the application registry from the backend endpoint.</p>
+            </div>
+            <div class="flex items-center justify-center gap-2 pt-1">
+                <button type="button" onclick="App.refreshData(true)" class="min-h-[38px] px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors whitespace-nowrap shrink-0">
+                    Retry Connection
                 </button>
             </div>
-            
-            <button id="login-btn" onclick="App.login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-all shadow-md active:scale-95">
-                Login
-            </button>
+        </div>
+
+        <!-- Applications Grid / Directory Container -->
+        <div id="apps-grid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2.5 sm:gap-3.5"></div>
+    </main>
+
+    <!-- ========================================== -->
+    <!-- VIEW 2: ADMIN AUTHENTICATION               -->
+    <!-- ========================================== -->
+    <main id="view-auth" class="flex-grow w-full max-w-7xl mx-auto px-3 sm:px-5 lg:px-8 py-4 flex items-center justify-center hidden">
+        <div class="bg-white dark:bg-[#111111] border border-zinc-200 dark:border-[#262626] p-5 sm:p-6 rounded-xl shadow-sm max-w-sm w-full space-y-4">
+            <div class="flex items-start justify-between gap-3">
+                <div class="space-y-0.5">
+                    <h2 class="font-display text-lg font-bold text-zinc-900 dark:text-white">Administrator Verification</h2>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400">Authenticate to manage workspace applications.</p>
+                </div>
+                <button type="button" onclick="UI.showLauncher(false)" class="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-[#1f1f1f] transition-colors" title="Return to Workspace">
+                    ✕
+                </button>
+            </div>
+
+            <div id="auth-alert" role="alert" class="hidden p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-300 rounded-lg text-xs font-medium leading-relaxed break-words"></div>
+
+            <div class="space-y-3">
+                <div>
+                    <label for="admin-password" class="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Administrator Password</label>
+                    <div class="relative">
+                        <input
+                            type="password"
+                            id="admin-password"
+                            placeholder="Enter administrator password"
+                            class="w-full min-h-[42px] px-3 py-2 pr-10 border border-zinc-300 dark:border-[#333333] rounded-lg bg-zinc-50 dark:bg-black text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                            onkeydown="if(event.key === 'Enter') App.login()"
+                        >
+                        <button
+                            type="button"
+                            onclick="UI.togglePasswordVisibility('admin-password')"
+                            class="absolute right-1 top-1/2 -translate-y-1/2 min-h-[34px] min-w-[34px] flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-md transition-colors focus:outline-none"
+                            title="Toggle password visibility"
+                        >
+                            <svg id="icon-eye" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" class="w-4 h-4">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                            </svg>
+                            <svg id="icon-eye-slash" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" class="w-4 h-4 hidden">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2.5 pt-1">
+                    <button
+                        type="button"
+                        onclick="UI.showLauncher(false)"
+                        class="min-h-[42px] px-3.5 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-[#1f1f1f] hover:bg-zinc-200 dark:hover:bg-[#2a2a2a] rounded-lg transition-colors whitespace-nowrap shrink-0"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        id="login-btn"
+                        onclick="App.login()"
+                        class="flex-grow min-h-[42px] bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-2 px-4 rounded-lg transition-all shadow-sm active:scale-[0.99] flex items-center justify-center whitespace-nowrap"
+                    >
+                        Unlock Directory Manager
+                    </button>
+                </div>
+            </div>
         </div>
     </main>
 
-    <!-- Settings Dashboard View -->
-    <main id="view-settings" class="flex-grow p-4 md:p-8 hidden overflow-y-auto hide-scroll">
-        <div class="max-w-3xl mx-auto bg-white dark:bg-[#111] rounded-2xl shadow-lg border border-gray-100 dark:border-[#222] overflow-hidden flex flex-col h-full">
-            <div class="p-4 border-b border-gray-200 dark:border-[#222] flex justify-between items-center bg-gray-50 dark:bg-[#0a0a0a]">
-                <h2 class="text-lg font-bold flex items-center">App Management</h2>
-                <div class="space-x-2">
-                    <button onclick="UI.openAppModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm">
-                        + Add App
+    <!-- ========================================== -->
+    <!-- VIEW 3: DIRECTORY MANAGER (ADMIN CONSOLE)  -->
+    <!-- ========================================== -->
+    <main id="view-settings" class="flex-grow w-full max-w-5xl mx-auto px-3 sm:px-5 lg:px-8 py-2.5 hidden">
+        <div class="bg-white dark:bg-[#111111] rounded-xl border border-zinc-200 dark:border-[#262626] overflow-hidden">
+            <!-- Console Header -->
+            <div class="p-3 sm:px-4 sm:py-3 border-b border-zinc-200 dark:border-[#262626] flex flex-wrap items-center justify-between gap-2.5 bg-zinc-50/60 dark:bg-[#0a0a0a]">
+                <div class="space-y-0.5">
+                    <h2 class="font-display text-sm sm:text-base font-bold text-zinc-900 dark:text-white">Registry Order & Configuration</h2>
+                    <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Drag handle to reorder launch priority.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onclick="UI.openAppModal()"
+                        class="min-h-[36px] bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm whitespace-nowrap shrink-0 flex items-center gap-1"
+                    >
+                        <span>+ Add App</span>
                     </button>
-                    <button onclick="UI.showLauncher()" class="bg-gray-200 dark:bg-[#1a1a1a] hover:bg-gray-300 dark:hover:bg-[#333] px-4 py-2 rounded-lg text-sm font-semibold transition-all">
+                    <button
+                        type="button"
+                        onclick="UI.showLauncher(false)"
+                        class="min-h-[36px] bg-zinc-900 dark:bg-white text-white dark:text-black hover:opacity-90 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap shrink-0"
+                    >
                         Done
                     </button>
                 </div>
             </div>
-            <div class="p-4 flex-grow overflow-y-auto hide-scroll">
-                <p class="text-xs text-gray-500 dark:text-gray-400 mb-4 uppercase tracking-wider font-semibold">Drag ≡ to reorder apps</p>
-                <div id="settings-app-list" class="space-y-3">
-                </div>
-            </div>
+
+            <!-- Inline Notification Banner for Reorder/Delete Errors or Status -->
+            <div id="settings-feedback" class="hidden px-4 py-2 text-xs font-medium border-b border-zinc-200 dark:border-[#262626] break-words"></div>
+
+            <!-- Sortable List Container -->
+            <div class="divide-y divide-zinc-200/80 dark:divide-[#222222]" id="settings-app-list"></div>
         </div>
     </main>
 
-    <!-- App Edit/Add Modal -->
-    <div id="app-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4 transition-all opacity-0 pointer-events-none flex">
-        <div class="bg-white dark:bg-[#111] w-full max-w-md rounded-2xl shadow-2xl overflow-hidden transform scale-95 transition-all">
-            <div class="p-4 border-b border-gray-200 dark:border-[#222] flex justify-between items-center">
-                <h3 id="modal-title" class="font-bold text-lg">Add WebApp</h3>
-                <button onclick="UI.closeAppModal()" class="text-gray-500 hover:text-gray-800 dark:hover:text-white text-xl">✕</button>
+    <!-- ========================================== -->
+    <!-- MODAL 1: ADD / EDIT WEBAPP & ICON STUDIO   -->
+    <!-- ========================================== -->
+    <div id="app-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-end sm:items-center justify-center z-50 p-0 sm:p-3 transition-opacity duration-150 opacity-0 pointer-events-none flex">
+        <div class="bg-white dark:bg-[#111111] w-full max-w-xl rounded-t-2xl sm:rounded-xl border border-zinc-200 dark:border-[#262626] shadow-2xl overflow-hidden transform scale-95 transition-transform duration-150 flex flex-col max-h-[92vh] sm:max-h-[90vh]">
+            <!-- Mobile Sheet Grab Handle -->
+            <div class="w-9 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full mx-auto mt-2 sm:hidden shrink-0"></div>
+
+            <!-- Modal Header -->
+            <div class="px-4 py-3 border-b border-zinc-200 dark:border-[#262626] flex justify-between items-center shrink-0">
+                <div>
+                    <h3 id="modal-title" class="font-display font-bold text-base text-zinc-900 dark:text-white">Add Web Application</h3>
+                    <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Configure launch destination and composite a workspace icon.</p>
+                </div>
+                <button type="button" onclick="UI.closeAppModal()" class="min-h-[34px] min-w-[34px] flex items-center justify-center rounded-lg text-zinc-400 hover:text-zinc-800 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#1f1f1f] transition-colors">
+                    ✕
+                </button>
             </div>
-            
-            <div class="p-6 space-y-4">
+
+            <!-- Modal Body (Scrollable) -->
+            <div class="p-4 space-y-4 overflow-y-auto flex-grow">
                 <input type="hidden" id="modal-app-id">
-                
-                <div id="modal-alert" class="hidden mb-2 p-3 bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 rounded-lg text-sm font-medium"></div>
 
-                <div>
-                    <label class="block text-sm font-medium mb-1">App Name</label>
-                    <input type="text" id="modal-app-name" class="w-full p-3 border border-gray-300 dark:border-[#333] rounded-lg bg-gray-50 dark:bg-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white" placeholder="e.g., HR Portal">
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium mb-1">Launch URL</label>
-                    <input type="url" id="modal-app-url" class="w-full p-3 border border-gray-300 dark:border-[#333] rounded-lg bg-gray-50 dark:bg-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white" placeholder="https://...">
+                <div id="modal-alert" role="alert" class="hidden p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-300 rounded-lg text-xs font-medium break-words"></div>
+
+                <!-- Name & URL Row -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label for="modal-app-name" class="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Application Name</label>
+                        <input
+                            type="text"
+                            id="modal-app-name"
+                            class="w-full min-h-[38px] px-3 py-1.5 border border-zinc-300 dark:border-[#333333] rounded-lg bg-zinc-50 dark:bg-black text-xs sm:text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="e.g., Operations Portal"
+                        >
+                    </div>
+                    <div>
+                        <label for="modal-app-url" class="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Launch Destination URL</label>
+                        <input
+                            type="url"
+                            id="modal-app-url"
+                            class="w-full min-h-[38px] px-3 py-1.5 border border-zinc-300 dark:border-[#333333] rounded-lg bg-zinc-50 dark:bg-black text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                            placeholder="https://..."
+                        >
+                    </div>
                 </div>
 
-                <div>
-                    <label class="block text-sm font-medium mb-1">App Icon</label>
-                    <div class="flex border-b border-gray-200 dark:border-[#222] mb-3">
-                        <button onclick="UI.setModalIconMode('drive')" id="tab-drive" class="flex-1 py-2 text-sm border-b-2 border-blue-600 text-blue-600 dark:text-blue-400 font-semibold transition-all">Google Drive</button>
-                        <button onclick="UI.setModalIconMode('url')" id="tab-url" class="flex-1 py-2 text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-semibold transition-all">Image URL</button>
-                        <button onclick="UI.setModalIconMode('upload')" id="tab-upload" class="flex-1 py-2 text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-semibold transition-all">Upload</button>
+                <!-- Icon Source Tabs -->
+                <div class="space-y-2.5">
+                    <div class="flex flex-wrap items-center justify-between gap-1">
+                        <label class="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">Application Icon Source</label>
+                        <span class="text-[11px] text-zinc-400">Google Drive · Direct URL · Local Upload</span>
                     </div>
 
-                    <div id="icon-drive-container">
-                        <div class="flex gap-2 mb-2">
-                            <input type="text" id="modal-app-icondrive" class="flex-grow p-3 border border-gray-300 dark:border-[#333] rounded-lg bg-gray-50 dark:bg-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white" placeholder="Drive URL or ID">
-                            <button type="button" onclick="DriveBrowser.open()" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-[#222] dark:hover:bg-[#333] text-gray-700 dark:text-gray-300 rounded-lg font-semibold transition-all whitespace-nowrap border border-gray-300 dark:border-[#444]" title="Browse Google Drive">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+                    <div class="grid grid-cols-3 gap-1 p-1 bg-zinc-100 dark:bg-black border border-zinc-200 dark:border-[#262626] rounded-lg" role="tablist">
+                        <button type="button" onclick="UI.setModalIconMode('drive')" id="tab-drive" class="min-h-[34px] py-1 px-2 text-xs font-semibold rounded-md transition-all whitespace-nowrap shrink-0">
+                            Google Drive
+                        </button>
+                        <button type="button" onclick="UI.setModalIconMode('url')" id="tab-url" class="min-h-[34px] py-1 px-2 text-xs font-semibold rounded-md transition-all whitespace-nowrap shrink-0">
+                            Image URL
+                        </button>
+                        <button type="button" onclick="UI.setModalIconMode('upload')" id="tab-upload" class="min-h-[34px] py-1 px-2 text-xs font-semibold rounded-md transition-all whitespace-nowrap shrink-0">
+                            Upload File
+                        </button>
+                    </div>
+
+                    <!-- Source 1: Google Drive -->
+                    <div id="icon-drive-container" class="space-y-2 pt-0.5">
+                        <div class="flex gap-1.5">
+                            <input
+                                type="text"
+                                id="modal-app-icondrive"
+                                class="flex-grow min-h-[38px] px-3 py-1.5 border border-zinc-300 dark:border-[#333333] rounded-lg bg-zinc-50 dark:bg-black text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                                placeholder="Paste Google Drive File URL or ID"
+                            >
+                            <button
+                                type="button"
+                                onclick="DriveBrowser.open()"
+                                class="min-h-[38px] px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-[#1f1f1f] dark:hover:bg-[#2a2a2a] text-zinc-700 dark:text-zinc-200 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 border border-zinc-300 dark:border-[#333333] flex items-center gap-1"
+                                title="Browse Google Drive Folders"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+                                <span>Browse</span>
+                            </button>
+                            <button
+                                type="button"
+                                onclick="IconStudio.loadImageFromDrive()"
+                                class="min-h-[38px] px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0"
+                            >
+                                Load
                             </button>
                         </div>
-                        <button type="button" onclick="IconStudio.loadImageFromDrive()" class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all whitespace-nowrap">Load Image</button>
                     </div>
 
-                    <div id="icon-url-container" class="hidden">
-                        <div class="flex gap-2">
-                            <input type="url" id="modal-app-iconurl" class="flex-grow p-3 border border-gray-300 dark:border-[#333] rounded-lg bg-gray-50 dark:bg-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white" placeholder="https://...">
-                            <button type="button" onclick="IconStudio.loadImageFromUrl()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all whitespace-nowrap">Load Image</button>
+                    <!-- Source 2: Direct Image URL -->
+                    <div id="icon-url-container" class="hidden pt-0.5">
+                        <div class="flex gap-1.5">
+                            <input
+                                type="url"
+                                id="modal-app-iconurl"
+                                class="flex-grow min-h-[38px] px-3 py-1.5 border border-zinc-300 dark:border-[#333333] rounded-lg bg-zinc-50 dark:bg-black text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                                placeholder="https://example.com/icon.png"
+                            >
+                            <button
+                                type="button"
+                                onclick="IconStudio.loadImageFromUrl()"
+                                class="min-h-[38px] px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0"
+                            >
+                                Load
+                            </button>
                         </div>
                     </div>
 
-                    <div id="icon-upload-container" class="hidden">
-                        <input type="file" id="modal-app-iconfile" onchange="IconStudio.loadImageFromFile(event)" accept="image/*" class="w-full p-2 border border-gray-300 dark:border-[#333] rounded-lg bg-gray-50 dark:bg-[#1a1a1a] focus:outline-none text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900/30 dark:file:text-blue-400">
+                    <!-- Source 3: Local File Upload -->
+                    <div id="icon-upload-container" class="hidden pt-0.5">
+                        <input
+                            type="file"
+                            id="modal-app-iconfile"
+                            onchange="IconStudio.loadImageFromFile(event)"
+                            accept="image/*"
+                            class="w-full min-h-[38px] p-1.5 border border-zinc-300 dark:border-[#333333] rounded-lg bg-zinc-50 dark:bg-black focus:outline-none text-xs text-zinc-600 dark:text-zinc-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer"
+                        >
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ICON STUDIO COMPOSITOR WORKSPACE           -->
+                <!-- ========================================== -->
+                <div id="icon-editor-workspace" class="hidden border border-zinc-200 dark:border-[#262626] bg-zinc-50/70 dark:bg-[#0a0a0a] rounded-xl p-3.5 space-y-3.5">
+                    <div class="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-zinc-200 dark:border-[#222222]">
+                        <div>
+                            <h4 class="font-display text-xs font-bold text-zinc-900 dark:text-white">Icon Studio Compositor</h4>
+                            <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Drag canvas to pan or adjust sliders.</p>
+                        </div>
+                        <button
+                            type="button"
+                            onclick="IconStudio.resetCustomizations()"
+                            class="min-h-[30px] text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1 px-2.5 py-1 rounded-md bg-white dark:bg-[#161616] border border-zinc-200 dark:border-[#333333] whitespace-nowrap shrink-0"
+                        >
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                            <span>Reset</span>
+                        </button>
                     </div>
 
-                    <!-- Icon Editor Workspace -->
-                    <div id="icon-editor-workspace" class="flex flex-col gap-4 bg-gray-100/50 dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#333] rounded-xl p-4 mt-4 hidden">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div class="space-y-1.5">
-                                <label class="font-semibold text-[10px] uppercase tracking-wider text-gray-500">Environment Banner</label>
-                                <select id="icon-env-select" class="w-full border border-gray-300 dark:border-[#333] rounded-lg py-1.5 px-3 bg-white dark:bg-[#1a1a1a] text-gray-700 dark:text-gray-300 outline-none focus:border-blue-500 transition text-xs appearance-none">
-                                    <option value="prod">Production (None)</option>
-                                    <option value="dev">Development (Testing)</option>
-                                    <option value="exp">Experimentation</option>
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                        <!-- Left: Interactive 256x256 Preview Canvas -->
+                        <div class="md:col-span-5 flex flex-col items-center justify-center space-y-1.5">
+                            <div class="relative rounded-xl p-1 bg-white dark:bg-[#161616] border border-zinc-200 dark:border-[#333333] shadow-sm">
+                                <canvas
+                                    id="preview-512-canvas"
+                                    width="256"
+                                    height="256"
+                                    class="w-40 h-40 sm:w-44 sm:h-44 rounded-lg checkerboard-canvas cursor-move touch-none"
+                                    title="Drag to reposition icon"
+                                ></canvas>
+                            </div>
+                            <span class="text-[10px] font-mono text-zinc-400 tabular-nums">Output: 256×256 PNG</span>
+                        </div>
+
+                        <!-- Right: Precision Controls -->
+                        <div class="md:col-span-7 space-y-3">
+                            <!-- Environment Overlay Ribbon -->
+                            <div>
+                                <label for="icon-env-select" class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Environment Ribbon Overlay</label>
+                                <select
+                                    id="icon-env-select"
+                                    class="w-full min-h-[36px] border border-zinc-300 dark:border-[#333333] rounded-lg py-1.5 px-2.5 bg-white dark:bg-[#161616] text-zinc-800 dark:text-zinc-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value="prod">Production (No Banner)</option>
+                                    <option value="dev">Development (TESTING Red Ribbon)</option>
+                                    <option value="exp">Experimentation (EXPERIMENTATION Purple Ribbon)</option>
                                 </select>
                             </div>
-                            
-                            <div class="space-y-1.5 flex flex-col justify-end">
-                                <label class="font-semibold text-[10px] uppercase tracking-wider text-gray-500 mb-1 md:hidden">Filters & Background</label>
-                                <div class="flex items-center flex-wrap gap-4 md:justify-end">
-                                    <!-- Color Picker & Transparent -->
-                                    <div class="flex items-center gap-2" title="Background Options">
-                                        <div class="w-8 h-8 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#444] rounded-full shadow-sm flex items-center justify-center relative overflow-hidden shrink-0 hover:border-blue-500 transition-colors">
-                                            <div id="bg-color-indicator" class="w-5 h-5 rounded-full border border-gray-200 dark:border-[#444]" style="background-color: #FFFFFF;"></div>
-                                            <input type="color" id="icon-bg-color" value="#FFFFFF" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
-                                        </div>
-                                        <label class="flex items-center gap-1.5 cursor-pointer">
-                                            <input type="checkbox" id="icon-bg-transparent" class="w-3.5 h-3.5 accent-blue-600 rounded">
-                                            <span class="text-xs font-semibold text-gray-700 dark:text-gray-300">Transparent</span>
-                                        </label>
+
+                            <!-- Background Fill & Convolution Filter -->
+                            <div class="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-white dark:bg-[#161616] rounded-lg border border-zinc-200 dark:border-[#2a2a2a]">
+                                <!-- Color Picker -->
+                                <div class="flex items-center gap-2">
+                                    <div class="w-7 h-7 bg-zinc-100 dark:bg-black border border-zinc-300 dark:border-[#444444] rounded-md flex items-center justify-center relative overflow-hidden shrink-0 cursor-pointer">
+                                        <div id="bg-color-indicator" class="w-4 h-4 rounded-sm border border-zinc-300 dark:border-[#444444]" style="background-color: #FFFFFF;"></div>
+                                        <input type="color" id="icon-bg-color" value="#FFFFFF" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" title="Choose solid background color">
                                     </div>
-                                    <!-- Divider -->
-                                    <div class="w-px h-5 bg-gray-300 dark:bg-[#444] hidden md:block"></div>
-                                    <!-- Sharpen Filter -->
-                                    <div class="flex items-center gap-1.5">
-                                        <input type="checkbox" id="icon-sharpen" class="w-3.5 h-3.5 rounded accent-blue-600 bg-white dark:bg-black border-gray-300 dark:border-[#555] cursor-pointer">
-                                        <label for="icon-sharpen" class="text-xs font-semibold text-gray-700 dark:text-gray-400 cursor-pointer select-none transition">Sharpen</label>
+                                    <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                                        <input type="checkbox" id="icon-bg-transparent" class="w-3.5 h-3.5 accent-blue-600 rounded cursor-pointer">
+                                        <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300">Transparent</span>
+                                    </label>
+                                </div>
+
+                                <!-- Sharpen Checkbox -->
+                                <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                                    <input type="checkbox" id="icon-sharpen" class="w-3.5 h-3.5 accent-blue-600 rounded cursor-pointer">
+                                    <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300">Sharpen</span>
+                                </label>
+                            </div>
+
+                            <!-- Zoom Scale Slider -->
+                            <div class="space-y-0.5">
+                                <div class="flex justify-between text-[11px]">
+                                    <span class="font-medium text-zinc-600 dark:text-zinc-400">Scale / Zoom</span>
+                                    <span id="scale-val" class="font-mono text-zinc-700 dark:text-zinc-300 tabular-nums">1.00x</span>
+                                </div>
+                                <input type="range" id="icon-scale" min="0.1" max="3" step="0.01" value="1" class="w-full cursor-pointer">
+                            </div>
+
+                            <!-- Horizontal X & Vertical Y Offset Sliders -->
+                            <div class="grid grid-cols-2 gap-2.5">
+                                <div class="space-y-0.5">
+                                    <div class="flex justify-between text-[11px]">
+                                        <span class="font-medium text-zinc-600 dark:text-zinc-400">Horizontal (X)</span>
+                                        <span id="x-val" class="font-mono text-zinc-700 dark:text-zinc-300 tabular-nums">0px</span>
                                     </div>
+                                    <input type="range" id="icon-x" min="-500" max="500" step="1" value="0" class="w-full cursor-pointer">
+                                </div>
+                                <div class="space-y-0.5">
+                                    <div class="flex justify-between text-[11px]">
+                                        <span class="font-medium text-zinc-600 dark:text-zinc-400">Vertical (Y)</span>
+                                        <span id="y-val" class="font-mono text-zinc-700 dark:text-zinc-300 tabular-nums">0px</span>
+                                    </div>
+                                    <input type="range" id="icon-y" min="-500" max="500" step="1" value="0" class="w-full cursor-pointer">
                                 </div>
                             </div>
                         </div>
-
-                        <!-- Workspace -->
-                        <div class="relative w-full flex items-center justify-center transition-opacity duration-300 z-10 mt-2">
-                           <div class="flex flex-col items-center gap-4">
-                               <div class="flex items-end gap-4">
-                                   <!-- Canvas & X Slider -->
-                                   <div class="flex flex-col gap-4">
-                                       <canvas id="preview-512-canvas" class="w-48 h-48 sm:w-64 sm:h-64 rounded-2xl bg-gray-200/50 dark:bg-black/20 shadow-md border border-gray-200 dark:border-[#333] transition-transform" width="256" height="256" style="background-image: repeating-conic-gradient(#e5e7eb 0% 25%, #f9fafb 0% 50%); background-size: 16px 16px;"></canvas>
-                                       
-                                       <!-- X Slider -->
-                                       <div class="flex items-center gap-3 bg-gray-50 dark:bg-[#111] p-2 rounded-lg border border-gray-200 dark:border-[#333]">
-                                           <span class="text-[10px] font-bold text-gray-500 w-3 text-center">X</span>
-                                           <input type="range" id="icon-x" min="-500" max="500" step="1" value="0" class="flex-grow accent-blue-500 h-1.5 bg-gray-300 dark:bg-[#444] rounded-lg appearance-none cursor-pointer">
-                                       </div>
-                                   </div>
-                                   
-                                   <!-- Y Slider -->
-                                   <div class="flex flex-col items-center gap-3 bg-gray-50 dark:bg-[#111] p-2 rounded-lg border border-gray-200 dark:border-[#333] h-48 sm:h-64 pb-4">
-                                       <span class="text-[10px] font-bold text-gray-500">Y</span>
-                                       <input type="range" id="icon-y" min="-500" max="500" step="1" value="0" orient="vertical" style="-webkit-appearance: slider-vertical;" class="flex-grow accent-blue-500 w-1.5 bg-gray-300 dark:bg-[#444] rounded-lg cursor-pointer">
-                                   </div>
-                               </div>
-
-                               <!-- Zoom Slider -->
-                               <div class="w-full flex items-center gap-3 bg-gray-50 dark:bg-[#111] p-3 rounded-lg border border-gray-200 dark:border-[#333]">
-                                   <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"/></svg>
-                                   <input type="range" id="icon-scale" min="0.1" max="3" step="0.01" value="1" class="flex-grow accent-blue-500 h-1.5 bg-gray-300 dark:bg-[#444] rounded-lg appearance-none cursor-pointer">
-                                   <span id="scale-val" class="text-[10px] font-mono text-gray-500 dark:text-gray-400 w-8 text-right shrink-0">1.00x</span>
-                               </div>
-                               
-                               <!-- Reset Customizations -->
-                               <div class="w-full flex justify-end mt-1">
-                                   <button type="button" onclick="IconStudio.resetCustomizations()" class="text-xs font-semibold text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded bg-gray-100/50 hover:bg-gray-100 dark:bg-black/20 dark:hover:bg-black/50 border border-transparent hover:border-gray-200 dark:hover:border-[#333]">
-                                       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                                       Reset Adjustments
-                                   </button>
-                               </div>
-                           </div>
-                       </div>
                     </div>
                 </div>
             </div>
 
-            <div class="p-4 bg-gray-50 dark:bg-[#0a0a0a] border-t border-gray-200 dark:border-[#222] flex justify-end space-x-2">
-                <button onclick="UI.closeAppModal()" class="px-5 py-2 rounded-lg font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#2a2a2a] transition-all">Cancel</button>
-                <button id="modal-save-btn" onclick="App.saveApp()" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all flex items-center shadow-md">
-                    <span>Save App</span>
+            <!-- Modal Footer -->
+            <div class="px-4 py-3 bg-zinc-50 dark:bg-[#0a0a0a] border-t border-zinc-200 dark:border-[#262626] flex justify-end items-center gap-2 shrink-0">
+                <button
+                    type="button"
+                    onclick="UI.closeAppModal()"
+                    class="min-h-[36px] px-3.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-[#222222] transition-colors whitespace-nowrap shrink-0"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    id="modal-save-btn"
+                    onclick="App.saveApp()"
+                    class="min-h-[36px] px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-all flex items-center justify-center shadow-sm whitespace-nowrap shrink-0"
+                >
+                    <span>Save Application</span>
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Drive Browser Modal -->
-    <div id="drive-browser-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-[60] p-4 transition-all opacity-0 pointer-events-none flex">
-        <div class="bg-white dark:bg-[#111] w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden transform scale-95 transition-all flex flex-col max-h-[80vh]">
-            <div class="p-4 border-b border-gray-200 dark:border-[#222] flex justify-between items-center bg-gray-50 dark:bg-[#1a1a1a]">
-                <div class="flex items-center gap-2 text-gray-800 dark:text-white">
-                    <button onclick="DriveBrowser.goUp()" id="drive-up-btn" class="p-1 hover:bg-gray-200 dark:hover:bg-[#333] rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+    <!-- ========================================== -->
+    <!-- MODAL 2: GOOGLE DRIVE FOLDER BROWSER       -->
+    <!-- ========================================== -->
+    <div id="drive-browser-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-end sm:items-center justify-center z-[60] p-0 sm:p-3 transition-opacity duration-150 opacity-0 pointer-events-none flex">
+        <div class="bg-white dark:bg-[#111111] w-full max-w-lg rounded-t-2xl sm:rounded-xl border border-zinc-200 dark:border-[#262626] shadow-2xl overflow-hidden transform scale-95 transition-transform duration-150 flex flex-col max-h-[82vh]">
+            <div class="px-4 py-3 border-b border-zinc-200 dark:border-[#262626] flex justify-between items-center bg-zinc-50 dark:bg-[#0a0a0a]">
+                <div class="flex items-center gap-2 min-w-0">
+                    <button
+                        type="button"
+                        onclick="DriveBrowser.goUp()"
+                        id="drive-up-btn"
+                        class="min-h-[34px] min-w-[34px] flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-[#222222] rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
+                        title="Parent Folder"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                     </button>
-                    <h3 id="drive-browser-title" class="font-bold text-lg">My Drive</h3>
+                    <div class="min-w-0">
+                        <h3 id="drive-browser-title" class="font-display font-bold text-sm text-zinc-900 dark:text-white break-words">My Drive</h3>
+                        <p class="text-[11px] text-zinc-500 dark:text-zinc-400 break-words">Select an image asset to load into Icon Studio</p>
+                    </div>
                 </div>
-                <button onclick="DriveBrowser.close()" class="text-gray-500 hover:text-gray-800 dark:hover:text-white text-xl">✕</button>
+                <button type="button" onclick="DriveBrowser.close()" class="min-h-[34px] min-w-[34px] flex items-center justify-center rounded-lg text-zinc-400 hover:text-zinc-800 dark:hover:text-white shrink-0">
+                    ✕
+                </button>
             </div>
-            
-            <div class="p-0 overflow-y-auto flex-grow relative bg-white dark:bg-[#0a0a0a]" id="drive-browser-list">
-                <!-- Content injected here -->
-            </div>
-            
-            <div class="p-4 border-t border-gray-200 dark:border-[#222] bg-gray-50 dark:bg-[#1a1a1a] flex justify-between items-center text-sm">
-                <span class="text-gray-500 dark:text-gray-400">Select an image file for your app icon</span>
-                <button onclick="DriveBrowser.close()" class="px-4 py-1.5 rounded-lg font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#333] transition-all border border-gray-300 dark:border-[#444]">Cancel</button>
+
+            <div class="p-0 overflow-y-auto flex-grow relative min-h-[240px] divide-y divide-zinc-100 dark:divide-[#222222]" id="drive-browser-list"></div>
+
+            <div class="px-4 py-2.5 border-t border-zinc-200 dark:border-[#262626] bg-zinc-50 dark:bg-[#0a0a0a] flex justify-between items-center text-xs">
+                <span class="text-zinc-500 dark:text-zinc-400">Google Drive Repository</span>
+                <button type="button" onclick="DriveBrowser.close()" class="min-h-[32px] px-3 py-1 rounded-lg font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-[#222222] transition-colors border border-zinc-300 dark:border-[#333333]">
+                    Close
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- Injecting Logic & PWA -->
+    <!-- ========================================== -->
+    <!-- MODAL 3: DELETE CONFIRMATION DIALOG        -->
+    <!-- ========================================== -->
+    <div id="confirm-delete-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center z-[70] p-3 transition-opacity duration-150 opacity-0 pointer-events-none flex">
+        <div class="bg-white dark:bg-[#111111] w-full max-w-sm rounded-xl border border-zinc-200 dark:border-[#262626] shadow-2xl p-5 space-y-4 transform scale-95 transition-transform duration-150">
+            <div class="space-y-1">
+                <h3 class="font-display text-base font-bold text-zinc-900 dark:text-white">Remove Application</h3>
+                <p id="confirm-delete-text" class="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed break-words">
+                    Are you sure you want to remove this application from the workspace registry?
+                </p>
+            </div>
+            <div class="flex items-center justify-end gap-2">
+                <button
+                    type="button"
+                    onclick="UI.closeDeleteConfirm()"
+                    class="min-h-[36px] px-3.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-[#1f1f1f] hover:bg-zinc-200 dark:hover:bg-[#2a2a2a] transition-colors"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    id="confirm-delete-btn"
+                    onclick="App.confirmDeleteApp()"
+                    class="min-h-[36px] px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors flex items-center gap-1.5"
+                >
+                    <span>Remove Application</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MOBILE FIXED BOTTOM TAB BAR (<768px)       -->
+    <!-- ========================================== -->
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 z-40 h-14 bg-white/95 dark:bg-black/95 backdrop-blur-md border-t border-zinc-200 dark:border-[#1f1f1f] grid grid-cols-3 items-center px-2" aria-label="Mobile Navigation">
+        <button type="button" id="mob-tab-launcher" onclick="UI.showLauncher(false)" class="min-h-[44px] flex flex-col items-center justify-center text-zinc-900 dark:text-white transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+            </svg>
+            <span class="text-[10px] font-semibold tracking-tight mt-0.5 whitespace-nowrap">Workspace</span>
+        </button>
+
+        <button type="button" id="mob-tab-manage" onclick="UI.showSettingsAuth()" class="min-h-[44px] flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+            </svg>
+            <span class="text-[10px] font-medium tracking-tight mt-0.5 whitespace-nowrap">Directory</span>
+        </button>
+
+        <button type="button" id="mob-tab-sync" onclick="App.refreshData(true)" class="min-h-[44px] flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
+            <svg id="mob-sync-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            <span class="text-[10px] font-medium tracking-tight mt-0.5 whitespace-nowrap">Sync</span>
+        </button>
+    </nav>
+
+    <!-- ========================================== -->
+    <!-- APPLICATION LOGIC & STUDIO ENGINE          -->
+    <!-- ========================================== -->
     <script>
         let sessionPassword = null;
-        let appsData =[];
+        let appsData = [];
+        let lastSerializedApps = '';
+        let searchQuery = '';
+        let searchRafId = null;
+        let layoutMode = localStorage.getItem('werone_layout_mode') || 'grid';
         let sortableInstance = null;
         let isUploading = false;
+        let pendingDeleteId = null;
 
+        // O(1) Cached DOM Element Lookup
+        const DOM = {
+            _cache: new Map(),
+            get(id) {
+                let el = this._cache.get(id);
+                if (!el) {
+                    el = document.getElementById(id);
+                    if (el) this._cache.set(id, el);
+                }
+                return el;
+            }
+        };
+
+        // Escape HTML helper for safe rendering
+        const ESCAPE_MAP = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        };
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>"']/g, ch => ESCAPE_MAP[ch]);
+        }
+
+        // ==========================================
+        // GOOGLE DRIVE FOLDER BROWSER
+        // ==========================================
         const DriveBrowser = {
             currentPath: [{ id: 'root', name: 'My Drive' }],
-            
+
             async open() {
-                const modal = document.getElementById('drive-browser-modal');
+                const modal = DOM.get('drive-browser-modal');
                 modal.classList.remove('hidden');
-                void modal.offsetWidth;
-                modal.classList.remove('opacity-0', 'pointer-events-none');
-                modal.firstElementChild.classList.remove('scale-95');
+                requestAnimationFrame(() => {
+                    modal.classList.remove('opacity-0', 'pointer-events-none');
+                    modal.firstElementChild.classList.remove('scale-95');
+                });
                 await this.loadFolder('root', 'My Drive');
             },
 
             close() {
-                const modal = document.getElementById('drive-browser-modal');
+                const modal = DOM.get('drive-browser-modal');
                 modal.classList.add('opacity-0', 'pointer-events-none');
                 modal.firstElementChild.classList.add('scale-95');
-                setTimeout(() => modal.classList.add('hidden'), 300);
+                setTimeout(() => modal.classList.add('hidden'), 150);
             },
 
             async loadFolder(id, name) {
-                const list = document.getElementById('drive-browser-list');
-                const title = document.getElementById('drive-browser-title');
-                const upBtn = document.getElementById('drive-up-btn');
-                
+                const list = DOM.get('drive-browser-list');
+                const title = DOM.get('drive-browser-title');
+                const upBtn = DOM.get('drive-up-btn');
+
                 if (id === 'root') {
                     this.currentPath = [{ id: 'root', name: 'My Drive' }];
                 } else {
@@ -362,24 +860,29 @@
                         this.currentPath.push({ id, name });
                     }
                 }
-                
+
                 title.textContent = this.currentPath[this.currentPath.length - 1].name;
                 upBtn.disabled = this.currentPath.length <= 1;
 
-                list.innerHTML = `<div class="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-black/50 z-10"><svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>`;
+                list.innerHTML = `
+                    <div class="p-8 flex flex-col items-center justify-center text-zinc-400 space-y-2.5">
+                        <svg class="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span class="text-xs">Reading Drive directory...</span>
+                    </div>
+                `;
 
                 try {
-                    // We attempt to call the GAS backend to fetch contents (both folders and files if supported)
-                    // Since we don't know the exact endpoint name, we try 'getDriveFiles'.
-                    // If it fails, we catch it and display a friendly error/fallback message.
                     const contents = await API.request('getDriveFiles', { parentId: id });
                     this.renderContents(contents);
                 } catch (err) {
                     list.innerHTML = `
-                        <div class="p-6 text-center text-gray-500 dark:text-gray-400">
-                            <svg class="w-12 h-12 mx-auto mb-3 text-red-400 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                            <p class="text-sm">Unable to browse Drive. The backend script may not have the <code>getDriveFiles</code> function deployed.</p>
-                            <p class="text-xs mt-2 opacity-70">Please manually paste the Google Drive ID or URL in the input instead.</p>
+                        <div class="p-6 text-center text-zinc-500 dark:text-zinc-400 space-y-1.5">
+                            <p class="text-xs font-semibold text-zinc-700 dark:text-zinc-200">Drive Directory Listing Unavailable</p>
+                            <p class="text-xs leading-relaxed break-words">The active Google Apps Script backend does not expose <code>getDriveFiles</code>, or requires authorization.</p>
+                            <p class="text-[11px] text-zinc-400 pt-1 break-words">Paste any Google Drive sharing link or file ID directly into the input field instead.</p>
                         </div>
                     `;
                 }
@@ -393,93 +896,227 @@
             },
 
             renderContents(contents) {
-                const list = document.getElementById('drive-browser-list');
-                list.innerHTML = '';
-                
+                const list = DOM.get('drive-browser-list');
+                list.textContent = '';
+
                 if (!contents || contents.length === 0) {
-                    list.innerHTML = `<div class="p-8 text-center text-sm text-gray-500">This folder is empty.</div>`;
+                    list.innerHTML = `<div class="p-8 text-center text-xs text-zinc-500">This folder contains no items.</div>`;
                     return;
                 }
 
-                contents.forEach(item => {
+                const fragment = document.createDocumentFragment();
+                const folderIcon = `<svg class="w-5 h-5 text-amber-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path></svg>`;
+                const fileIcon = `<svg class="w-5 h-5 text-blue-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"></path></svg>`;
+
+                for (let i = 0; i < contents.length; i++) {
+                    const item = contents[i];
                     const isFolder = item.mimeType === 'application/vnd.google-apps.folder';
-                    const el = document.createElement('div');
-                    el.className = "flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-[#1a1a1a] cursor-pointer border-b border-gray-100 dark:border-[#222] transition-colors";
-                    
-                    const icon = isFolder 
-                        ? `<svg class="w-6 h-6 text-gray-400 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path></svg>`
-                        : `<svg class="w-6 h-6 text-blue-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"></path></svg>`;
+                    const el = document.createElement('button');
+                    el.type = 'button';
+                    el.className = "w-full flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-50 dark:hover:bg-[#1a1a1a] text-left transition-colors min-h-[44px]";
 
                     el.innerHTML = `
-                        ${icon}
-                        <span class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate flex-grow">${item.name}</span>
+                        ${isFolder ? folderIcon : fileIcon}
+                        <span class="text-xs font-medium text-zinc-800 dark:text-zinc-200 break-words flex-grow leading-snug">${escapeHtml(item.name)}</span>
+                        <span class="text-[11px] text-zinc-400 shrink-0">${isFolder ? 'Open' : 'Select'}</span>
                     `;
-                    
+
                     el.onclick = () => {
                         if (isFolder) {
                             this.loadFolder(item.id, item.name);
                         } else {
-                            document.getElementById('modal-app-icondrive').value = item.id;
+                            DOM.get('modal-app-icondrive').value = item.id;
                             this.close();
                             IconStudio.loadImageFromDrive();
                         }
                     };
-                    
-                    list.appendChild(el);
-                });
+
+                    fragment.appendChild(el);
+                }
+
+                list.appendChild(fragment);
             }
         };
 
+        // ==========================================
+        // ICON STUDIO COMPOSITOR (256x256 CANVAS)
+        // ==========================================
         const IconStudio = {
             img: new Image(),
+            ctx: null,
+            rafId: null,
             isLoaded: false,
+            isLoadingImage: false,
+            fallbackQueue: [],
+            isDragging: false,
+            dragStartX: 0,
+            dragStartY: 0,
+            initialOffsetX: 0,
+            initialOffsetY: 0,
 
             init() {
+                const canvas = DOM.get('preview-512-canvas');
+                this.ctx = canvas.getContext('2d', { willReadFrequently: true });
+
                 this.img.onload = () => this.onImageLoaded();
                 this.img.onerror = () => {
-                    const alertBox = document.getElementById('modal-alert');
-                    alertBox.textContent = "Failed to load image. If using a URL, it may be blocked by CORS. Try a different URL or download and upload it.";
+                    if (!this.isLoadingImage) return;
+                    if (this.fallbackQueue && this.fallbackQueue.length > 0) {
+                        const nextUrl = this.fallbackQueue.shift();
+                        if (nextUrl.startsWith('data:') || nextUrl.startsWith('blob:')) {
+                            this.img.removeAttribute('crossOrigin');
+                        } else {
+                            this.img.crossOrigin = 'Anonymous';
+                        }
+                        this.img.src = nextUrl;
+                        return;
+                    }
+                    this.isLoadingImage = false;
+                    const alertBox = DOM.get('modal-alert');
+                    alertBox.textContent = "Unable to load image into studio. Ensure the image URL or Google Drive file is accessible, or upload the file directly.";
                     alertBox.classList.remove('hidden');
                 };
 
-                const els =['icon-scale', 'icon-x', 'icon-y'];
-                els.forEach(id => {
-                    document.getElementById(id).addEventListener('input', () => {
+                ['icon-scale', 'icon-x', 'icon-y'].forEach(id => {
+                    DOM.get(id).addEventListener('input', () => {
                         this.updateLabels();
-                        this.render();
+                        this.scheduleRender();
                     });
                 });
 
-                document.getElementById('icon-bg-color').addEventListener('input', (e) => {
-                    document.getElementById('bg-color-indicator').style.backgroundColor = e.target.value;
-                    document.getElementById('icon-bg-transparent').checked = false;
-                    this.render();
+                DOM.get('icon-bg-color').addEventListener('input', (e) => {
+                    DOM.get('bg-color-indicator').style.backgroundColor = e.target.value;
+                    DOM.get('icon-bg-transparent').checked = false;
+                    this.scheduleRender();
                 });
 
                 ['icon-sharpen', 'icon-env-select', 'icon-bg-transparent'].forEach(id => {
-                    document.getElementById(id).addEventListener('change', () => this.render());
+                    DOM.get(id).addEventListener('change', () => this.scheduleRender());
+                });
+
+                // Interactive Direct Canvas Dragging (Mouse + Touch)
+                const startDrag = (clientX, clientY) => {
+                    if (!this.isLoaded) return;
+                    this.isDragging = true;
+                    this.dragStartX = clientX;
+                    this.dragStartY = clientY;
+                    this.initialOffsetX = parseInt(DOM.get('icon-x').value, 10) || 0;
+                    this.initialOffsetY = parseInt(DOM.get('icon-y').value, 10) || 0;
+                };
+
+                const moveDrag = (clientX, clientY) => {
+                    if (!this.isDragging) return;
+                    const dx = Math.round((clientX - this.dragStartX) * 2);
+                    const dy = Math.round((clientY - this.dragStartY) * 2);
+                    const xInput = DOM.get('icon-x');
+                    const yInput = DOM.get('icon-y');
+                    xInput.value = Math.max(parseInt(xInput.min, 10), Math.min(parseInt(xInput.max, 10), this.initialOffsetX + dx));
+                    yInput.value = Math.max(parseInt(yInput.min, 10), Math.min(parseInt(yInput.max, 10), this.initialOffsetY + dy));
+                    this.updateLabels();
+                    this.scheduleRender();
+                };
+
+                const endDrag = () => {
+                    if (!this.isDragging) return;
+                    this.isDragging = false;
+                    if (DOM.get('icon-sharpen').checked) {
+                        this.scheduleRender();
+                    }
+                };
+
+                canvas.addEventListener('mousedown', e => startDrag(e.clientX, e.clientY));
+                window.addEventListener('mousemove', e => moveDrag(e.clientX, e.clientY), { passive: true });
+                window.addEventListener('mouseup', endDrag);
+
+                canvas.addEventListener('touchstart', e => {
+                    if (e.touches.length === 1) {
+                        startDrag(e.touches[0].clientX, e.touches[0].clientY);
+                    }
+                }, { passive: true });
+                window.addEventListener('touchmove', e => {
+                    if (this.isDragging && e.touches.length === 1) {
+                        moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+                    }
+                }, { passive: true });
+                window.addEventListener('touchend', endDrag);
+            },
+
+            scheduleRender() {
+                if (this.rafId !== null) return;
+                this.rafId = requestAnimationFrame(() => {
+                    this.rafId = null;
+                    this.render();
                 });
             },
 
             extractDriveId(val) {
-                const match = val.match(/id=([a-zA-Z0-9_-]+)/) || val.match(/folders\/([a-zA-Z0-9_-]+)/) || val.match(/file\/d\/([a-zA-Z0-9_-]+)/);
-                return match ? match[1] : val;
+                if (!val) return '';
+                const trimmed = val.trim();
+                const match =
+                    trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/) ||
+                    trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
+                    trimmed.match(/\/folders\/([a-zA-Z0-9_-]+)/) ||
+                    trimmed.match(/googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/);
+                if (match) return match[1];
+                if (!trimmed.includes('/') && !trimmed.includes(':') && /^[a-zA-Z0-9_-]{10,}$/.test(trimmed)) {
+                    return trimmed;
+                }
+                return '';
+            },
+
+            buildDriveCandidates(id) {
+                const thumbUrl = `https://drive.google.com/thumbnail?id=${id}&sz=w512`;
+                const lh3Url = `https://lh3.googleusercontent.com/d/${id}=w512`;
+                const ucUrl = `https://drive.google.com/uc?export=download&id=${id}`;
+                return [
+                    `/api/image-proxy?url=${encodeURIComponent(thumbUrl)}`,
+                    `/api/image-proxy?url=${encodeURIComponent(lh3Url)}`,
+                    `/api/image-proxy?url=${encodeURIComponent(ucUrl)}`,
+                    lh3Url,
+                    `https://wsrv.nl/?url=${encodeURIComponent(lh3Url)}&output=png`,
+                    `https://wsrv.nl/?url=${encodeURIComponent(thumbUrl)}&output=png`,
+                    `https://wsrv.nl/?url=${encodeURIComponent(ucUrl)}&output=png`
+                ];
+            },
+
+            loadWithCandidates(candidates) {
+                if (!candidates || candidates.length === 0) return;
+                DOM.get('modal-alert').classList.add('hidden');
+                this.fallbackQueue = candidates.slice(1);
+                this.isLoadingImage = true;
+                const firstUrl = candidates[0];
+                if (firstUrl.startsWith('data:') || firstUrl.startsWith('blob:')) {
+                    this.img.removeAttribute('crossOrigin');
+                } else {
+                    this.img.crossOrigin = 'Anonymous';
+                }
+                this.img.src = firstUrl;
             },
 
             loadImageFromDrive() {
-                const val = document.getElementById('modal-app-icondrive').value.trim();
+                const val = DOM.get('modal-app-icondrive').value.trim();
                 if (!val) return;
-                const id = this.extractDriveId(val);
-                const directUrl = `https://drive.google.com/thumbnail?id=${id}&sz=w512`;
-                this.img.crossOrigin = 'Anonymous';
-                this.img.src = `https://wsrv.nl/?url=${encodeURIComponent(directUrl)}&output=png`;
+                const id = this.extractDriveId(val) || val;
+                this.loadWithCandidates(this.buildDriveCandidates(id));
             },
 
             loadImageFromUrl() {
-                const url = document.getElementById('modal-app-iconurl').value.trim();
+                const url = DOM.get('modal-app-iconurl').value.trim();
                 if (!url) return;
-                this.img.crossOrigin = 'Anonymous';
-                this.img.src = `https://wsrv.nl/?url=${encodeURIComponent(url)}&output=png`;
+                if (url.startsWith('data:') || url.startsWith('blob:')) {
+                    this.loadWithCandidates([url]);
+                    return;
+                }
+                const driveId = this.extractDriveId(url);
+                if (driveId) {
+                    this.loadWithCandidates(this.buildDriveCandidates(driveId));
+                    return;
+                }
+                this.loadWithCandidates([
+                    `/api/image-proxy?url=${encodeURIComponent(url)}`,
+                    `https://wsrv.nl/?url=${encodeURIComponent(url)}&output=png`,
+                    url
+                ]);
             },
 
             loadImageFromFile(e) {
@@ -487,106 +1124,110 @@
                 if (!file) return;
                 const reader = new FileReader();
                 reader.onload = (event) => {
-                    this.img.removeAttribute('crossOrigin');
-                    this.img.src = event.target.result;
+                    this.loadWithCandidates([event.target.result]);
                 };
                 reader.readAsDataURL(file);
             },
 
             onImageLoaded() {
+                if (!this.isLoadingImage) return;
+                this.isLoadingImage = false;
+                this.fallbackQueue = [];
                 this.isLoaded = true;
-                document.getElementById('icon-editor-workspace').classList.remove('hidden');
-                document.getElementById('modal-alert').classList.add('hidden');
-                
-                const maxDim = Math.max(this.img.width, this.img.height);
-                document.getElementById('icon-x').min = -maxDim;
-                document.getElementById('icon-x').max = maxDim;
-                document.getElementById('icon-y').min = -maxDim;
-                document.getElementById('icon-y').max = maxDim;
-                
-                document.getElementById('icon-env-select').value = "prod";
-                document.getElementById('icon-bg-color').value = "#FFFFFF";
-                document.getElementById('bg-color-indicator').style.backgroundColor = "#FFFFFF";
-                document.getElementById('icon-bg-transparent').checked = false;
-                document.getElementById('icon-x').value = 0;
-                document.getElementById('icon-y').value = 0;
-                document.getElementById('icon-scale').value = (this.img.width > this.img.height) ? (512 / this.img.height) : (512 / this.img.width);
-                document.getElementById('icon-sharpen').checked = false;
+                DOM.get('icon-editor-workspace').classList.remove('hidden');
+                DOM.get('modal-alert').classList.add('hidden');
+
+                const maxDim = Math.max(this.img.width, this.img.height, 500);
+                const xInput = DOM.get('icon-x');
+                const yInput = DOM.get('icon-y');
+                xInput.min = -maxDim;
+                xInput.max = maxDim;
+                yInput.min = -maxDim;
+                yInput.max = maxDim;
+
+                DOM.get('icon-env-select').value = "prod";
+                DOM.get('icon-bg-color').value = "#FFFFFF";
+                DOM.get('bg-color-indicator').style.backgroundColor = "#FFFFFF";
+                DOM.get('icon-bg-transparent').checked = false;
+                xInput.value = 0;
+                yInput.value = 0;
+                const fitScale = (this.img.width > this.img.height) ? (512 / this.img.height) : (512 / this.img.width);
+                DOM.get('icon-scale').value = Math.min(3, Math.max(0.1, fitScale)).toFixed(2);
+                DOM.get('icon-sharpen').checked = false;
 
                 this.updateLabels();
                 this.render();
             },
 
             updateLabels() {
-                document.getElementById('scale-val').textContent = parseFloat(document.getElementById('icon-scale').value).toFixed(2) + 'x';
+                DOM.get('scale-val').textContent = parseFloat(DOM.get('icon-scale').value).toFixed(2) + 'x';
+                DOM.get('x-val').textContent = DOM.get('icon-x').value + 'px';
+                DOM.get('y-val').textContent = DOM.get('icon-y').value + 'px';
             },
 
             getState() {
                 return {
-                    env: document.getElementById('icon-env-select').value,
-                    scale: parseFloat(document.getElementById('icon-scale').value),
-                    x: parseInt(document.getElementById('icon-x').value),
-                    y: parseInt(document.getElementById('icon-y').value),
-                    bgColor: document.getElementById('icon-bg-color').value,
-                    isTransparent: document.getElementById('icon-bg-transparent').checked,
-                    sharpen: document.getElementById('icon-sharpen').checked
+                    env: DOM.get('icon-env-select').value,
+                    scale: parseFloat(DOM.get('icon-scale').value),
+                    x: parseInt(DOM.get('icon-x').value, 10) || 0,
+                    y: parseInt(DOM.get('icon-y').value, 10) || 0,
+                    bgColor: DOM.get('icon-bg-color').value,
+                    isTransparent: DOM.get('icon-bg-transparent').checked,
+                    sharpen: DOM.get('icon-sharpen').checked
                 };
             },
 
+            // Unrolled 5-point cross convolution kernel [0, -0.5, 0, -0.5, 3, -0.5, 0, -0.5, 0]
             sharpenFilter(ctx, w, h) {
                 const imageData = ctx.getImageData(0, 0, w, h);
                 const data = imageData.data;
                 const output = ctx.createImageData(w, h);
-                const outputData = output.data;
-                const k = [0, -0.5, 0, -0.5, 3, -0.5, 0, -0.5, 0];
+                const out = output.data;
+                const stride = w * 4;
 
                 for (let y = 1; y < h - 1; y++) {
-                    for (let x = 1; x < w - 1; x++) {
-                        for (let c = 0; c < 3; c++) {
-                            let sum = 0;
-                            for (let ky = -1; ky <= 1; ky++) {
-                                for (let kx = -1; kx <= 1; kx++) {
-                                    const idx = ((y + ky) * w + (x + kx)) * 4 + c;
-                                    const kidx = (ky + 1) * 3 + (kx + 1);
-                                    sum += data[idx] * k[kidx];
-                                }
-                            }
-                            outputData[(y * w + x) * 4 + c] = Math.min(255, Math.max(0, sum));
-                        }
-                        outputData[(y * w + x) * 4 + 3] = data[(y * w + x) * 4 + 3];
+                    let idx = (y * w + 1) * 4;
+                    for (let x = 1; x < w - 1; x++, idx += 4) {
+                        const r = data[idx] * 3 - (data[idx - 4] + data[idx + 4] + data[idx - stride] + data[idx + stride]) * 0.5;
+                        const g = data[idx + 1] * 3 - (data[idx - 3] + data[idx + 5] + data[idx - stride + 1] + data[idx + stride + 1]) * 0.5;
+                        const b = data[idx + 2] * 3 - (data[idx - 2] + data[idx + 6] + data[idx - stride + 2] + data[idx + stride + 2]) * 0.5;
+
+                        out[idx] = r < 0 ? 0 : (r > 255 ? 255 : r);
+                        out[idx + 1] = g < 0 ? 0 : (g > 255 ? 255 : g);
+                        out[idx + 2] = b < 0 ? 0 : (b > 255 ? 255 : b);
+                        out[idx + 3] = data[idx + 3];
                     }
                 }
                 ctx.putImageData(output, 0, 0);
             },
 
-            render() {
+            render(forceSharpen = false) {
                 if (!this.isLoaded) return;
                 const state = this.getState();
-                const canvas = document.getElementById('preview-512-canvas');
-                const ctx = canvas.getContext('2d');
+                const ctx = this.ctx || DOM.get('preview-512-canvas').getContext('2d');
                 const size = 256;
-                
+
                 ctx.clearRect(0, 0, size, size);
-                
+
                 if (!state.isTransparent) {
                     ctx.fillStyle = state.bgColor;
                     ctx.fillRect(0, 0, size, size);
                 }
-                
-                const scaleModifier = size / 512; 
+
+                const scaleModifier = size / 512;
                 const scale = state.scale * scaleModifier;
                 const offsetX = state.x * scaleModifier;
                 const offsetY = state.y * scaleModifier;
 
                 const drawWidth = this.img.width * scale;
                 const drawHeight = this.img.height * scale;
-                
+
                 const px = (size - drawWidth) / 2 + offsetX;
                 const py = (size - drawHeight) / 2 + offsetY;
 
                 ctx.drawImage(this.img, px, py, drawWidth, drawHeight);
 
-                if (state.sharpen) {
+                if (state.sharpen && (!this.isDragging || forceSharpen)) {
                     this.sharpenFilter(ctx, size, size);
                 }
 
@@ -598,10 +1239,10 @@
                     const text = state.env === 'dev' ? 'TESTING' : 'EXPERIMENTATION';
                     let fontSize = bannerHeight * 0.85;
                     ctx.font = `900 ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
-                    
+
                     const textWidth = ctx.measureText(text).width;
                     const maxTextWidth = size * 0.94;
-                    
+
                     if (textWidth > maxTextWidth) {
                         fontSize = fontSize * (maxTextWidth / textWidth);
                         ctx.font = `900 ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
@@ -610,7 +1251,7 @@
                     ctx.fillStyle = '#FFFFFF';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    
+
                     const opticalOffsetY = fontSize * 0.05;
                     ctx.fillText(text, size / 2, (bannerHeight / 2) + opticalOffsetY);
                 }
@@ -618,138 +1259,257 @@
 
             getBase64() {
                 if (!this.isLoaded) return null;
-                const canvas = document.getElementById('preview-512-canvas');
+                if (this.rafId !== null) {
+                    cancelAnimationFrame(this.rafId);
+                    this.rafId = null;
+                }
+                this.render(true);
+                const canvas = DOM.get('preview-512-canvas');
                 return canvas.toDataURL('image/png').split(',')[1];
             },
 
             resetCustomizations() {
-                document.getElementById('icon-scale').value = 1;
-                document.getElementById('icon-x').value = 0;
-                document.getElementById('icon-y').value = 0;
-                document.getElementById('icon-bg-color').value = '#FFFFFF';
-                document.getElementById('bg-color-indicator').style.backgroundColor = '#FFFFFF';
-                document.getElementById('icon-bg-transparent').checked = false;
-                document.getElementById('icon-env-select').value = 'prod';
-                document.getElementById('icon-sharpen').checked = false;
-                this.render();
+                if (!this.isLoaded) return;
+                const fitScale = (this.img.width > this.img.height) ? (512 / this.img.height) : (512 / this.img.width);
+                DOM.get('icon-scale').value = Math.min(3, Math.max(0.1, fitScale)).toFixed(2);
+                DOM.get('icon-x').value = 0;
+                DOM.get('icon-y').value = 0;
+                DOM.get('icon-bg-color').value = '#FFFFFF';
+                DOM.get('bg-color-indicator').style.backgroundColor = '#FFFFFF';
+                DOM.get('icon-bg-transparent').checked = false;
+                DOM.get('icon-env-select').value = 'prod';
+                DOM.get('icon-sharpen').checked = false;
+                this.updateLabels();
+                this.scheduleRender();
             },
 
             reset() {
+                if (this.rafId !== null) {
+                    cancelAnimationFrame(this.rafId);
+                    this.rafId = null;
+                }
                 this.isLoaded = false;
-                this.img.src = '';
-                document.getElementById('icon-editor-workspace').classList.add('hidden');
-                document.getElementById('modal-app-icondrive').value = '';
-                document.getElementById('modal-app-iconurl').value = '';
-                document.getElementById('modal-app-iconfile').value = '';
+                this.isLoadingImage = false;
+                this.fallbackQueue = [];
+                this.img.removeAttribute('src');
+                DOM.get('icon-editor-workspace').classList.add('hidden');
+                DOM.get('modal-app-icondrive').value = '';
+                DOM.get('modal-app-iconurl').value = '';
+                DOM.get('modal-app-iconfile').value = '';
             }
         };
 
-        window.addEventListener('DOMContentLoaded', () => {
-            IconStudio.init();
-        });
-
-        // Register the physical Service Worker
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js')
-                .then(() => console.log("Service Worker Registered Natively"))
-                .catch(err => console.error("SW Registration Failed:", err));
-        }
-
-        // Network Layer
+        // ==========================================
+        // NETWORK LAYER (GOOGLE APPS SCRIPT RPC)
+        // ==========================================
         const API = {
+            _inFlightGetApps: null,
+
             async request(action, payload = {}) {
-                if(!GAS_WEBAPP_URL) {
-                    throw new Error("Action Required: Please setup the GAS Web App URL.");
+                if (action === 'getApps' && this._inFlightGetApps) {
+                    return this._inFlightGetApps;
                 }
-                
+
+                const promise = this._executeRequest(action, payload);
+                if (action === 'getApps') {
+                    this._inFlightGetApps = promise;
+                    promise.finally(() => {
+                        this._inFlightGetApps = null;
+                    });
+                }
+                return promise;
+            },
+
+            async _executeRequest(action, payload = {}) {
+                const targetUrl = window.WERONE_CONFIG && window.WERONE_CONFIG.GAS_WEBAPP_URL;
+                if (!targetUrl) {
+                    throw new Error("Action Required: Please configure GAS_WEBAPP_URL in /backend/config.js.");
+                }
+
                 if (['addApp', 'editApp', 'deleteApp', 'reorderApps', 'uploadIcon'].includes(action)) {
                     payload.password = sessionPassword;
                 }
 
                 try {
-                    const response = await fetch(GAS_WEBAPP_URL, {
+                    const response = await fetch(targetUrl, {
                         method: 'POST',
                         body: JSON.stringify({ action, payload }),
                         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                         redirect: "follow"
                     });
-                    
+
                     const result = await response.json();
-                    
+
                     if (action === 'verifyPassword') {
                         if (result.success === true) return true;
-                        throw new Error("Incorrect Password");
+                        throw new Error("Incorrect administrator password.");
                     }
-                    
+
                     if (!result.success) throw new Error(result.error || "Server action failed.");
                     return result.data;
                 } catch (err) {
-                    // Use console.warn instead of console.error to prevent triggering strict automated error catchers for expected fallback scenarios (e.g., missing GAS functions causing CORS/Failed to fetch)
                     console.warn("API Request Warning:", err.message);
-                    throw new Error(err.message === "Failed to fetch" 
-                        ? "Network error or Backend URL is incorrect/unauthorized by Admin." 
-                        : err.message);
+                    throw new Error(
+                        err.message === "Failed to fetch"
+                            ? "Network error or Backend URL is unreachable / unauthorized."
+                            : err.message
+                    );
                 }
             }
         };
 
-        // Application Logic
+        // ==========================================
+        // CORE APPLICATION CONTROLLER
+        // ==========================================
         const App = {
             async init() {
                 UI.initTheme();
                 UI.renderEnvBadge();
-                await this.refreshData();
+                UI.renderSkeletons();
+                UI.setLayoutMode(layoutMode, false);
+                IconStudio.init();
+
+                // Keyboard shortcut: "/" to focus search, Escape to close modals
+                window.addEventListener('keydown', (e) => {
+                    if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+                        const launcherVisible = !DOM.get('view-launcher').classList.contains('hidden');
+                        if (launcherVisible) {
+                            e.preventDefault();
+                            DOM.get('app-search-input').focus();
+                        }
+                    } else if (e.key === 'Escape') {
+                        if (!DOM.get('confirm-delete-modal').classList.contains('hidden')) {
+                            UI.closeDeleteConfirm();
+                        } else if (!DOM.get('drive-browser-modal').classList.contains('hidden')) {
+                            DriveBrowser.close();
+                        } else if (!DOM.get('app-modal').classList.contains('hidden')) {
+                            UI.closeAppModal();
+                        }
+                    }
+                });
+
+                await this.refreshData(false);
             },
 
-            async refreshData() {
-                const cachedData = localStorage.getItem('hubAppsData');
-                if (cachedData) {
-                    try {
-                        appsData = JSON.parse(cachedData);
-                        UI.showLauncher(false);
-                    } catch (e) {
-                        console.error('Failed to parse cached data', e);
-                    }
-                } else {
-                    UI.showLauncher(true); 
+            setAppsData(list) {
+                appsData = Array.isArray(list) ? list : [];
+                for (let i = 0; i < appsData.length; i++) {
+                    const item = appsData[i];
+                    item._searchName = (item.Name || '').toLowerCase();
                 }
-                
+            },
+
+            persistCache() {
+                const cleanList = appsData.map(({ ID, Name, URL, IconURL, OrderIndex }) => ({
+                    ID, Name, URL, IconURL, OrderIndex
+                }));
+                const serialized = JSON.stringify(cleanList);
+                lastSerializedApps = serialized;
+                const cacheKey = window.WERONE_CONFIG.CACHE_KEY || 'hubAppsData';
+                try {
+                    localStorage.setItem(cacheKey, serialized);
+                    if (cacheKey !== 'hubAppsData') {
+                        localStorage.setItem('hubAppsData', serialized);
+                    }
+                } catch (_) {}
+            },
+
+            logoutAdmin() {
+                sessionPassword = null;
+                UI.showLauncher(false);
+            },
+
+            async refreshData(forceIndicator = false) {
+                const cacheKey = window.WERONE_CONFIG.CACHE_KEY || 'hubAppsData';
+                const cachedData = localStorage.getItem(cacheKey) || localStorage.getItem('hubAppsData');
+
+                UI.setSyncStatus('Syncing registry...');
+
+                let renderedFromCache = false;
+                if (cachedData && !forceIndicator) {
+                    try {
+                        const parsed = JSON.parse(cachedData);
+                        this.setAppsData(parsed);
+                        lastSerializedApps = JSON.stringify(
+                            appsData.map(({ ID, Name, URL, IconURL, OrderIndex }) => ({ ID, Name, URL, IconURL, OrderIndex }))
+                        );
+                        UI.showLauncher(false);
+                        renderedFromCache = true;
+                    } catch (e) {
+                        UI.showLauncher(true);
+                    }
+                } else if (!cachedData || forceIndicator) {
+                    if (!appsData.length) {
+                        UI.showLauncher(true);
+                    }
+                }
+
                 try {
                     const freshData = await API.request('getApps');
-                    appsData = freshData;
-                    localStorage.setItem('hubAppsData', JSON.stringify(appsData));
-                    
-                    if (document.getElementById('view-launcher').classList.contains('hidden') === false) {
-                        UI.showLauncher(false);
-                    } else if (document.getElementById('view-settings').classList.contains('hidden') === false) {
+                    const freshList = Array.isArray(freshData) ? freshData : [];
+                    const freshSerialized = JSON.stringify(
+                        freshList.map(({ ID, Name, URL, IconURL, OrderIndex }) => ({ ID, Name, URL, IconURL, OrderIndex }))
+                    );
+                    const hasChanged = freshSerialized !== lastSerializedApps;
+
+                    this.setAppsData(freshList);
+                    this.persistCache();
+
+                    DOM.get('launcher-error-state').classList.add('hidden');
+                    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    UI.setSyncStatus(`Synced ${nowStr}`);
+
+                    if (!DOM.get('view-launcher').classList.contains('hidden')) {
+                        if (!renderedFromCache || hasChanged || !DOM.get('loading-indicator').classList.contains('hidden')) {
+                            UI.showLauncher(false);
+                        } else {
+                            UI.updateCounts();
+                        }
+                    } else if (!DOM.get('view-settings').classList.contains('hidden') && hasChanged) {
                         UI.renderSettingsList();
                     }
                 } catch (err) {
-                    if (!cachedData) {
-                        document.getElementById('loading-indicator').innerHTML = `<span class="text-red-500 font-medium text-sm mt-4">Failed to load workspace.<br>${err.message}</span>`;
+                    if (cachedData && appsData.length > 0) {
+                        UI.setSyncStatus('Offline cache active');
+                        if (!renderedFromCache) UI.showLauncher(false);
+                    } else {
+                        UI.setSyncStatus('Sync failed');
+                        DOM.get('loading-indicator').classList.add('hidden');
+                        DOM.get('apps-grid').classList.add('hidden');
+                        DOM.get('launcher-error-message').textContent = err.message;
+                        DOM.get('launcher-error-state').classList.remove('hidden');
                     }
                 }
             },
 
             async login() {
-                const passInput = document.getElementById('admin-password');
-                const alertBox = document.getElementById('auth-alert');
-                const btn = document.getElementById('login-btn'); 
-                
+                const passInput = DOM.get('admin-password');
+                const alertBox = DOM.get('auth-alert');
+                const btn = DOM.get('login-btn');
+
+                if (!passInput.value) {
+                    alertBox.textContent = "Please enter the administrator password.";
+                    alertBox.classList.remove('hidden');
+                    return;
+                }
+
                 try {
-                    btn.innerHTML = `<svg class="animate-spin h-5 w-5 mx-auto text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
-                    
+                    btn.disabled = true;
+                    btn.innerHTML = `
+                        <svg class="animate-spin h-4 w-4 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Verifying...</span>
+                    `;
+
                     const isValid = await API.request('verifyPassword', { password: passInput.value });
                     if (isValid) {
                         sessionPassword = passInput.value;
                         passInput.value = '';
-                        
-                        const iconEye = document.getElementById('icon-eye');
-                        const iconEyeSlash = document.getElementById('icon-eye-slash');
                         passInput.type = 'password';
-                        if (iconEye) iconEye.classList.remove('hidden');
-                        if (iconEyeSlash) iconEyeSlash.classList.add('hidden');
-                        
+                        DOM.get('icon-eye').classList.remove('hidden');
+                        DOM.get('icon-eye-slash').classList.add('hidden');
                         alertBox.classList.add('hidden');
                         UI.showSettingsDashboard();
                     }
@@ -757,105 +1517,162 @@
                     alertBox.textContent = err.message;
                     alertBox.classList.remove('hidden');
                 } finally {
-                    btn.innerText = "Login";
+                    btn.disabled = false;
+                    btn.textContent = "Unlock Directory Manager";
                 }
             },
 
             async saveApp() {
                 if (isUploading) return;
-                const alertBox = document.getElementById('modal-alert');
-                const btn = document.getElementById('modal-save-btn');
-                
-                const id = document.getElementById('modal-app-id').value;
-                const name = document.getElementById('modal-app-name').value.trim();
-                const url = document.getElementById('modal-app-url').value.trim();
-                let iconUrl = document.getElementById('modal-app-iconurl').value.trim();
-                const fileInput = document.getElementById('modal-app-iconfile');
-                
+                const alertBox = DOM.get('modal-alert');
+                const btn = DOM.get('modal-save-btn');
+
+                const id = DOM.get('modal-app-id').value;
+                const name = DOM.get('modal-app-name').value.trim();
+                const url = DOM.get('modal-app-url').value.trim();
+                let iconUrl = DOM.get('modal-app-iconurl').value.trim();
+
                 if (!name || !url) {
-                    alertBox.textContent = "Name and Launch URL are required.";
+                    alertBox.textContent = "Application Name and Launch Destination URL are required.";
                     alertBox.classList.remove('hidden');
                     return;
                 }
 
-                btn.innerHTML = `<svg class="animate-spin h-5 w-5 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Saving...`;
+                btn.innerHTML = `
+                    <svg class="animate-spin h-4 w-4 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Saving...</span>
+                `;
                 alertBox.classList.add('hidden');
                 isUploading = true;
 
                 try {
-                    let base64Data = IconStudio.getBase64();
-                    
+                    const base64Data = IconStudio.getBase64();
+
                     if (base64Data) {
-                        btn.innerHTML = `<svg class="animate-spin h-5 w-5 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Uploading Icon...`;
-                        
+                        btn.innerHTML = `
+                            <svg class="animate-spin h-4 w-4 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>Uploading Icon...</span>
+                        `;
+
                         iconUrl = await API.request('uploadIcon', {
                             filename: name.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '_icon.png',
                             base64: base64Data,
                             mimeType: 'image/png'
                         });
-                    } else if (!document.getElementById('icon-url-container').classList.contains('hidden')) {
-                        iconUrl = document.getElementById('modal-app-iconurl').value.trim();
-                    } else if (!document.getElementById('icon-drive-container').classList.contains('hidden')) {
-                        const driveVal = document.getElementById('modal-app-icondrive').value.trim();
+                    } else if (!DOM.get('icon-url-container').classList.contains('hidden')) {
+                        iconUrl = DOM.get('modal-app-iconurl').value.trim();
+                    } else if (!DOM.get('icon-drive-container').classList.contains('hidden')) {
+                        const driveVal = DOM.get('modal-app-icondrive').value.trim();
                         if (driveVal) {
-                            const driveId = IconStudio.extractDriveId(driveVal);
+                            const driveId = IconStudio.extractDriveId(driveVal) || driveVal;
                             iconUrl = `https://drive.google.com/thumbnail?id=${driveId}&sz=w512`;
                         }
                     }
 
                     const appData = { id, name, url, iconUrl };
-                    
+
                     if (id) {
                         await API.request('editApp', { app: appData });
                         const idx = appsData.findIndex(a => a.ID === id);
-                        if(idx > -1) {
+                        if (idx > -1) {
                             appsData[idx].Name = name;
+                            appsData[idx]._searchName = name.toLowerCase();
                             appsData[idx].URL = url;
                             appsData[idx].IconURL = iconUrl;
                         }
                     } else {
                         const newIdObj = await API.request('addApp', { app: appData });
-                        appsData.push({ ID: newIdObj.id, Name: name, URL: url, IconURL: iconUrl, OrderIndex: appsData.length });
+                        appsData.push({
+                            ID: newIdObj.id,
+                            Name: name,
+                            _searchName: name.toLowerCase(),
+                            URL: url,
+                            IconURL: iconUrl,
+                            OrderIndex: appsData.length
+                        });
                     }
-                    
-                    localStorage.setItem('hubAppsData', JSON.stringify(appsData));
+
+                    this.persistCache();
+
                     UI.closeAppModal();
                     UI.renderSettingsList();
+                    UI.updateCounts();
+                    UI.showSettingsBanner('Application saved to registry.', 'success');
                 } catch (err) {
                     alertBox.textContent = err.message;
                     alertBox.classList.remove('hidden');
                 } finally {
-                    btn.innerHTML = `Save App`;
+                    btn.innerHTML = `<span>Save Application</span>`;
                     isUploading = false;
                 }
             },
 
-            async deleteApp(id) {
-                if(!confirm("Are you sure you want to remove this app?")) return;
+            promptDeleteApp(id, name) {
+                pendingDeleteId = id;
+                DOM.get('confirm-delete-text').textContent = `Are you sure you want to remove "${name}" from the workspace registry?`;
+                const modal = DOM.get('confirm-delete-modal');
+                modal.classList.remove('hidden');
+                requestAnimationFrame(() => {
+                    modal.classList.remove('opacity-0', 'pointer-events-none');
+                    modal.firstElementChild.classList.remove('scale-95');
+                });
+            },
+
+            async confirmDeleteApp() {
+                if (!pendingDeleteId) return;
+                const id = pendingDeleteId;
+                const btn = DOM.get('confirm-delete-btn');
+                btn.disabled = true;
+                btn.textContent = 'Removing...';
+
                 try {
                     await API.request('deleteApp', { id });
                     appsData = appsData.filter(a => a.ID !== id);
-                    localStorage.setItem('hubAppsData', JSON.stringify(appsData));
+                    this.persistCache();
+                    UI.closeDeleteConfirm();
                     UI.renderSettingsList();
+                    UI.updateCounts();
+                    UI.showSettingsBanner('Application removed from workspace.', 'success');
                 } catch (err) {
-                    alert("Failed to delete: " + err.message);
+                    UI.closeDeleteConfirm();
+                    UI.showSettingsBanner('Failed to remove application: ' + err.message, 'error');
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = 'Remove Application';
+                    pendingDeleteId = null;
                 }
             },
 
             async saveOrder() {
-                const list = document.getElementById('settings-app-list');
-                const orderedIds = Array.from(list.children).map(item => item.dataset.id);
+                const list = DOM.get('settings-app-list');
+                const orderedIds = Array.from(list.children).map(item => item.dataset.id).filter(Boolean);
+                const orderMap = new Map();
+                for (let i = 0; i < orderedIds.length; i++) {
+                    orderMap.set(orderedIds[i], i);
+                }
+
                 try {
+                    UI.showSettingsBanner('Saving new launch order...', 'neutral');
                     await API.request('reorderApps', { orderedIds });
-                    appsData.sort((a,b) => orderedIds.indexOf(a.ID) - orderedIds.indexOf(b.ID));
-                    localStorage.setItem('hubAppsData', JSON.stringify(appsData));
+                    appsData.sort((a, b) => (orderMap.get(a.ID) ?? 0) - (orderMap.get(b.ID) ?? 0));
+                    this.persistCache();
+                    UI.renderSettingsList();
+                    UI.showSettingsBanner('Launch order updated.', 'success');
                 } catch (err) {
-                    console.error("Failed to reorder:", err);
+                    UI.showSettingsBanner('Failed to reorder applications: ' + err.message, 'error');
                 }
             }
         };
 
-        // UI Manipulation Logic
+        // ==========================================
+        // UI PRESENTATION & VIEW ORCHESTRATION
+        // ==========================================
         const UI = {
             initTheme() {
                 if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -871,34 +1688,150 @@
             },
 
             renderEnvBadge() {
-                if (APP_ENV === "DEV") {
-                    const devBar = document.getElementById('dev-mode-bar');
-                    if (devBar) devBar.classList.remove('hidden');
+                const devBar = DOM.get('dev-mode-bar');
+                const cfg = window.WERONE_CONFIG || {};
+
+                if (devBar) {
+                    if (cfg.SHOW_DEV_BANNER) {
+                        devBar.textContent = cfg.DEV_BANNER_TEXT || 'DEV';
+                        devBar.classList.remove('hidden');
+                    } else {
+                        devBar.classList.add('hidden');
+                    }
+                }
+            },
+
+            setSyncStatus(text) {
+                const el = DOM.get('meta-sync-status');
+                if (el) el.textContent = text;
+            },
+
+            updateCounts() {
+                const countEl = DOM.get('meta-app-count');
+                if (countEl) {
+                    const total = appsData.length;
+                    countEl.textContent = `${total} ${total === 1 ? 'Application' : 'Applications'}`;
+                }
+            },
+
+            renderSkeletons() {
+                const container = DOM.get('loading-indicator');
+                const skeletonCard = `
+                    <div class="p-3 rounded-xl bg-white dark:bg-[#111111] border border-zinc-200/80 dark:border-[#222222] flex flex-col items-center justify-center space-y-2.5 skeleton-pulse">
+                        <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-zinc-200 dark:bg-[#222222]"></div>
+                        <div class="w-20 h-3 rounded bg-zinc-200 dark:bg-[#222222]"></div>
+                    </div>
+                `;
+                container.innerHTML = skeletonCard.repeat(14);
+            },
+
+            setLayoutMode(mode, rerender = true) {
+                layoutMode = mode === 'list' ? 'list' : 'grid';
+                localStorage.setItem('werone_layout_mode', layoutMode);
+
+                const gridBtn = DOM.get('layout-btn-grid');
+                const listBtn = DOM.get('layout-btn-list');
+                const activeCls = "min-h-[32px] min-w-[34px] p-1 rounded-md transition-all flex items-center justify-center shrink-0 bg-white dark:bg-[#222222] text-zinc-900 dark:text-white shadow-sm";
+                const inactiveCls = "min-h-[32px] min-w-[34px] p-1 rounded-md transition-all flex items-center justify-center shrink-0 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white";
+
+                if (layoutMode === 'grid') {
+                    gridBtn.className = activeCls;
+                    listBtn.className = inactiveCls;
+                } else {
+                    listBtn.className = activeCls;
+                    gridBtn.className = inactiveCls;
+                }
+
+                if (rerender) this.renderAppsGrid();
+            },
+
+            handleSearch(val) {
+                searchQuery = (val || '').trim().toLowerCase();
+                const clearBtn = DOM.get('search-clear-btn');
+                if (searchQuery.length > 0) {
+                    clearBtn.classList.remove('hidden');
+                    clearBtn.classList.add('flex');
+                } else {
+                    clearBtn.classList.add('hidden');
+                    clearBtn.classList.remove('flex');
+                }
+                if (searchRafId !== null) cancelAnimationFrame(searchRafId);
+                searchRafId = requestAnimationFrame(() => {
+                    searchRafId = null;
+                    this.renderAppsGrid();
+                });
+            },
+
+            clearSearch() {
+                const input = DOM.get('app-search-input');
+                input.value = '';
+                this.handleSearch('');
+                input.focus();
+            },
+
+            updateNavState(activeView) {
+                const navLauncher = DOM.get('nav-link-launcher');
+                const navManage = DOM.get('nav-link-manage');
+                const mobLauncher = DOM.get('mob-tab-launcher');
+                const mobManage = DOM.get('mob-tab-manage');
+                const settingsBtn = DOM.get('header-settings-btn');
+                const heading = DOM.get('page-heading');
+                const controlsRow = DOM.get('launcher-controls-row');
+
+                const desktopActive = "hover:text-zinc-900 dark:hover:text-white transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 border-zinc-900 dark:border-white text-zinc-900 dark:text-white font-semibold";
+                const desktopInactive = "hover:text-zinc-900 dark:hover:text-white transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 border-transparent";
+
+                const mobileActive = "min-h-[44px] flex flex-col items-center justify-center text-zinc-900 dark:text-white transition-colors";
+                const mobileInactive = "min-h-[44px] flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors";
+
+                if (activeView === 'launcher') {
+                    navLauncher.className = desktopActive;
+                    navManage.className = desktopInactive;
+                    mobLauncher.className = mobileActive;
+                    mobManage.className = mobileInactive;
+                    if (settingsBtn) {
+                        settingsBtn.className = "min-h-[38px] min-w-[38px] p-1.5 rounded-full hover:bg-zinc-100 dark:hover:bg-[#1f1f1f] text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-all flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500";
+                    }
+                    heading.textContent = "Application Directory";
+                    if (controlsRow) controlsRow.classList.remove('hidden');
+                } else {
+                    navLauncher.className = desktopInactive;
+                    navManage.className = desktopActive;
+                    mobLauncher.className = mobileInactive;
+                    mobManage.className = mobileActive;
+                    if (settingsBtn) {
+                        settingsBtn.className = "min-h-[38px] min-w-[38px] p-1.5 rounded-full bg-zinc-200 dark:bg-[#222222] text-zinc-900 dark:text-white transition-all flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500";
+                    }
+                    heading.textContent = activeView === 'settings' ? "Directory Manager" : "Administrator Access";
+                    if (controlsRow) controlsRow.classList.add('hidden');
                 }
             },
 
             togglePasswordVisibility(id) {
-                const input = document.getElementById(id);
-                const iconEye = document.getElementById('icon-eye');
-                const iconEyeSlash = document.getElementById('icon-eye-slash');
-                
+                const input = DOM.get(id);
+                const iconEye = DOM.get('icon-eye');
+                const iconEyeSlash = DOM.get('icon-eye-slash');
+
                 if (input.type === 'password') {
                     input.type = 'text';
-                    if (iconEye) iconEye.classList.add('hidden');
-                    if (iconEyeSlash) iconEyeSlash.classList.remove('hidden');
+                    iconEye.classList.add('hidden');
+                    iconEyeSlash.classList.remove('hidden');
                 } else {
                     input.type = 'password';
-                    if (iconEye) iconEye.classList.remove('hidden');
-                    if (iconEyeSlash) iconEyeSlash.classList.add('hidden');
+                    iconEye.classList.remove('hidden');
+                    iconEyeSlash.classList.add('hidden');
                 }
             },
 
             showLauncher(loading = false) {
                 this.hideAllViews();
-                document.getElementById('view-launcher').classList.remove('hidden');
-                document.getElementById('loading-indicator').classList.toggle('hidden', !loading);
-                document.getElementById('apps-grid').classList.toggle('hidden', loading);
-                if(!loading) this.renderAppsGrid();
+                this.updateNavState('launcher');
+                DOM.get('view-launcher').classList.remove('hidden');
+                DOM.get('loading-indicator').classList.toggle('hidden', !loading);
+                DOM.get('apps-grid').classList.toggle('hidden', loading);
+                DOM.get('launcher-error-state').classList.add('hidden');
+                this.updateCounts();
+                if (!loading) this.renderAppsGrid();
             },
 
             showSettingsAuth() {
@@ -906,173 +1839,320 @@
                     this.showSettingsDashboard();
                 } else {
                     this.hideAllViews();
-                    document.getElementById('view-auth').classList.remove('hidden');
-                    document.getElementById('admin-password').focus();
-                    document.getElementById('auth-alert').classList.add('hidden');
+                    this.updateNavState('auth');
+                    DOM.get('view-auth').classList.remove('hidden');
+                    DOM.get('auth-alert').classList.add('hidden');
+                    requestAnimationFrame(() => DOM.get('admin-password').focus());
                 }
             },
 
             showSettingsDashboard() {
                 this.hideAllViews();
-                document.getElementById('view-settings').classList.remove('hidden');
+                this.updateNavState('settings');
+                DOM.get('view-settings').classList.remove('hidden');
+                DOM.get('settings-feedback').classList.add('hidden');
                 this.renderSettingsList();
             },
 
-            hideAllViews() {['view-launcher', 'view-auth', 'view-settings'].forEach(id => {
-                    document.getElementById(id).classList.add('hidden');
-                });
+            hideAllViews() {
+                DOM.get('view-launcher').classList.add('hidden');
+                DOM.get('view-auth').classList.add('hidden');
+                DOM.get('view-settings').classList.add('hidden');
+            },
+
+            showSettingsBanner(message, type = 'neutral') {
+                const banner = DOM.get('settings-feedback');
+                banner.classList.remove('hidden');
+                if (type === 'error') {
+                    banner.className = "px-4 py-2 text-xs font-medium border-b border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 break-words";
+                } else if (type === 'success') {
+                    banner.className = "px-4 py-2 text-xs font-medium border-b border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 break-words";
+                } else {
+                    banner.className = "px-4 py-2 text-xs font-medium border-b border-zinc-200 dark:border-[#262626] bg-zinc-100/70 dark:bg-[#1a1a1a] text-zinc-600 dark:text-zinc-300 break-words";
+                }
+                banner.textContent = message;
+            },
+
+            buildAppIconMarkup(app, sizeClasses = "w-14 h-14 sm:w-16 sm:h-16 rounded-xl text-xl", isLazy = false) {
+                const initial = escapeHtml(app.Name ? app.Name.charAt(0).toUpperCase() : '?');
+                const fallbackHtml = `<div class="${sizeClasses} app-initial-tile border border-zinc-200/80 dark:border-[#2a2a2a] flex shrink-0 items-center justify-center font-display font-bold select-none">${initial}</div>`;
+                const safeFallback = fallbackHtml.replace(/"/g, '&quot;');
+
+                if (app.IconURL && app.IconURL.length > 5) {
+                    let finalUrl = app.IconURL;
+                    let errHandler = `this.outerHTML='${safeFallback}'`;
+
+                    if (finalUrl.includes('drive.google.com')) {
+                        const match = finalUrl.match(/id=([a-zA-Z0-9_-]+)/);
+                        if (match && match[1]) {
+                            finalUrl = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w256`;
+                        }
+                    } else if (finalUrl.startsWith('http')) {
+                        const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(finalUrl)}&w=256&output=webp`;
+                        errHandler = `if(!this.dataset.retried){this.dataset.retried='true'; this.src='${proxyUrl}';} else {this.outerHTML='${safeFallback}';}`;
+                    }
+
+                    const loadingAttr = isLazy ? 'loading="lazy" decoding="async"' : 'decoding="async"';
+                    return `<img src="${escapeHtml(finalUrl)}" alt="${escapeHtml(app.Name)}" ${loadingAttr} referrerpolicy="no-referrer" class="${sizeClasses} object-contain bg-white dark:bg-black border border-zinc-200/80 dark:border-[#262626] shrink-0 transition-transform duration-150 group-hover:-translate-y-0.5" onerror="${errHandler}">`;
+                }
+                return fallbackHtml;
             },
 
             renderAppsGrid() {
-                const grid = document.getElementById('apps-grid');
-                grid.innerHTML = '';
-                
-                if(appsData.length === 0) {
-                    grid.innerHTML = `<div class="col-span-full text-center text-gray-400 mt-10">No web apps installed. Add some in settings!</div>`;
+                const grid = DOM.get('apps-grid');
+                grid.textContent = '';
+
+                const filteredApps = searchQuery
+                    ? appsData.filter(app => (app._searchName ?? (app.Name || '').toLowerCase()).includes(searchQuery))
+                    : appsData;
+
+                if (appsData.length === 0) {
+                    grid.className = "w-full";
+                    grid.innerHTML = `
+                        <div class="max-w-md mx-auto my-8 p-6 bg-white dark:bg-[#111111] border border-zinc-200 dark:border-[#262626] rounded-xl text-center space-y-3">
+                            <div class="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-[#1f1f1f] border border-zinc-200 dark:border-[#333333] text-zinc-900 dark:text-white flex items-center justify-center mx-auto font-display font-bold text-base">
+                                +
+                            </div>
+                            <div class="space-y-1">
+                                <h3 class="font-display text-sm font-bold text-zinc-900 dark:text-white">No Applications Installed</h3>
+                                <p class="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">Your workspace registry is currently empty. Authenticate in the Directory Manager to add your first web application.</p>
+                            </div>
+                            <button type="button" onclick="UI.showSettingsAuth()" class="min-h-[38px] px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+                                Open Directory Manager
+                            </button>
+                        </div>
+                    `;
                     return;
                 }
 
-                appsData.forEach(app => {
-                    const el = document.createElement('a');
-                    el.href = app.URL;
-                    el.target = '_blank';
-                    el.rel = 'noopener noreferrer';
-                    el.className = "flex flex-row md:flex-col items-center p-3 md:p-0 bg-white md:bg-transparent dark:bg-[#111] md:dark:bg-transparent border border-gray-100 md:border-transparent dark:border-[#222] md:dark:border-transparent rounded-xl md:rounded-none group cursor-pointer active:scale-95 transition-transform shadow-sm md:shadow-none";
-                    
-                    let iconHtml = '';
-                    const initial = app.Name ? app.Name.charAt(0).toUpperCase() : '?';
-                    
-                    const fallbackHtml = `<div class="w-12 h-12 md:w-20 md:h-20 rounded-xl md:rounded-2xl shadow-sm app-placeholder flex shrink-0 items-center justify-center text-xl md:text-3xl font-bold transition-transform md:group-hover:-translate-y-1">${initial}</div>`;
-                    const safeFallback = fallbackHtml.replace(/"/g, '&quot;');
-
-                    if (app.IconURL && app.IconURL.length > 5) {
-                        let finalUrl = app.IconURL;
-                        let errHandler = `this.outerHTML='${safeFallback}'`;
-
-                        if (finalUrl.includes('drive.google.com')) {
-                            const match = finalUrl.match(/id=([a-zA-Z0-9_-]+)/);
-                            if (match && match[1]) {
-                                finalUrl = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w256`;
-                            }
-                        } else if (finalUrl.startsWith('http')) {
-                            const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(finalUrl)}&w=256&output=webp`;
-                            errHandler = `if(!this.dataset.retried){this.dataset.retried='true'; this.src='${proxyUrl}';} else {this.outerHTML='${safeFallback}';}`;
-                        }
-
-                        iconHtml = `<img src="${finalUrl}" alt="${app.Name}" referrerpolicy="no-referrer" class="w-12 h-12 md:w-20 md:h-20 object-contain rounded-xl md:rounded-2xl shadow-sm border border-gray-100 dark:border-[#222] bg-white dark:bg-[#111] transition-transform shrink-0 md:group-hover:-translate-y-1" onerror="${errHandler}">`;
-                    } else {
-                        iconHtml = fallbackHtml;
-                    }
-
-                    el.innerHTML = `
-                        ${iconHtml}
-                        <span class="mt-0 md:mt-3 ml-4 md:ml-0 text-base md:text-base font-semibold md:font-medium text-left md:text-center w-full px-1 line-clamp-2 leading-tight text-gray-800 dark:text-gray-100">${app.Name}</span>
+                if (filteredApps.length === 0) {
+                    grid.className = "w-full";
+                    grid.innerHTML = `
+                        <div class="max-w-md mx-auto my-8 p-6 bg-white dark:bg-[#111111] border border-zinc-200 dark:border-[#262626] rounded-xl text-center space-y-2.5">
+                            <h3 class="font-display text-sm font-bold text-zinc-900 dark:text-white">No Matching Applications</h3>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400 break-words">No applications matched "${escapeHtml(searchQuery)}".</p>
+                            <button type="button" onclick="UI.clearSearch()" class="min-h-[34px] px-3.5 py-1 text-xs font-semibold text-zinc-900 dark:text-white bg-zinc-100 dark:bg-[#222222] rounded-lg hover:opacity-90 transition-opacity">
+                                Clear Filter
+                            </button>
+                        </div>
                     `;
-                    grid.appendChild(el);
-                });
+                    return;
+                }
+
+                const fragment = document.createDocumentFragment();
+
+                if (layoutMode === 'list') {
+                    grid.className = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5";
+                    for (let i = 0; i < filteredApps.length; i++) {
+                        const app = filteredApps[i];
+                        const el = document.createElement('a');
+                        el.href = app.URL;
+                        el.target = '_blank';
+                        el.rel = 'noopener noreferrer';
+                        el.className = "app-row-contain group flex items-center gap-3 p-2.5 bg-white dark:bg-[#111111] hover:bg-zinc-50/90 dark:hover:bg-[#1a1a1a] border border-zinc-200/80 dark:border-[#222222] hover:border-zinc-300 dark:hover:border-[#333333] rounded-xl transition-all duration-150 active:scale-[0.99] min-h-[54px]";
+
+                        const iconHtml = this.buildAppIconMarkup(app, "w-10 h-10 rounded-lg text-base", i >= 16);
+
+                        el.innerHTML = `
+                            ${iconHtml}
+                            <div class="flex-grow min-w-0">
+                                <div class="font-display font-semibold text-xs sm:text-sm text-zinc-900 dark:text-white break-words leading-snug">${escapeHtml(app.Name)}</div>
+                            </div>
+                            <svg class="w-4 h-4 text-zinc-300 dark:text-zinc-600 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 group-hover:translate-x-0.5 transition-all shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                            </svg>
+                        `;
+                        fragment.appendChild(el);
+                    }
+                } else {
+                    grid.className = "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2.5 sm:gap-3.5 items-stretch";
+                    for (let i = 0; i < filteredApps.length; i++) {
+                        const app = filteredApps[i];
+                        const el = document.createElement('a');
+                        el.href = app.URL;
+                        el.target = '_blank';
+                        el.rel = 'noopener noreferrer';
+                        el.className = "app-card-contain group flex flex-col items-center justify-start p-3 bg-white dark:bg-[#111111] hover:bg-zinc-50/70 dark:hover:bg-[#1a1a1a] border border-zinc-200/80 dark:border-[#222222] hover:border-zinc-300 dark:hover:border-[#333333] rounded-xl transition-all duration-150 active:scale-[0.98] h-full";
+
+                        const iconHtml = this.buildAppIconMarkup(app, "w-14 h-14 sm:w-16 sm:h-16 rounded-xl text-xl", i >= 14);
+
+                        el.innerHTML = `
+                            ${iconHtml}
+                            <span class="mt-2 font-display text-xs sm:text-[13px] font-semibold text-center text-zinc-900 dark:text-zinc-100 break-words leading-snug w-full">${escapeHtml(app.Name)}</span>
+                        `;
+                        fragment.appendChild(el);
+                    }
+                }
+
+                grid.appendChild(fragment);
             },
 
             renderSettingsList() {
-                const list = document.getElementById('settings-app-list');
-                list.innerHTML = '';
-                
-                appsData.forEach(app => {
-                    const li = document.createElement('div');
-                    li.dataset.id = app.ID;
-                    li.className = "flex items-center bg-gray-50 dark:bg-black p-3 rounded-xl border border-gray-100 dark:border-[#222] shadow-sm";
-                    li.innerHTML = `
-                        <div class="drag-handle p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 mr-2" title="Drag to reorder">≡</div>
-                        <div class="flex-grow min-w-0">
-                            <h4 class="font-semibold text-sm truncate">${app.Name}</h4>
-                            <p class="text-xs text-gray-500 truncate">${app.URL}</p>
-                        </div>
-                        <div class="flex space-x-2 ml-4">
-                            <button onclick='UI.openAppModal(${JSON.stringify(app).replace(/'/g, "&#39;")})' class="p-2 bg-white dark:bg-[#111] text-blue-600 dark:text-blue-400 rounded-lg shadow-sm border border-gray-200 dark:border-[#333] hover:bg-gray-50 dark:hover:bg-[#2a2a2a] text-xs transition-colors">Edit</button>
-                            <button onclick="App.deleteApp('${app.ID}')" class="p-2 bg-white dark:bg-[#111] text-red-600 dark:text-red-400 rounded-lg shadow-sm border border-gray-200 dark:border-[#333] hover:bg-red-50 dark:hover:bg-red-900/20 text-xs transition-colors">Delete</button>
+                const list = DOM.get('settings-app-list');
+                list.textContent = '';
+
+                if (appsData.length === 0) {
+                    list.innerHTML = `
+                        <div class="p-8 text-center space-y-2">
+                            <p class="text-xs font-semibold text-zinc-700 dark:text-zinc-300">No Applications in Registry</p>
+                            <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Click "+ Add App" above to register your first workspace app.</p>
                         </div>
                     `;
-                    list.appendChild(li);
-                });
+                    return;
+                }
 
-                if(sortableInstance) sortableInstance.destroy();
-                sortableInstance = new Sortable(list, {
-                    handle: '.drag-handle',
-                    animation: 150,
-                    ghostClass: 'sortable-ghost',
-                    onEnd: () => App.saveOrder()
-                });
+                const fragment = document.createDocumentFragment();
+
+                for (let index = 0; index < appsData.length; index++) {
+                    const app = appsData[index];
+                    const row = document.createElement('div');
+                    row.dataset.id = app.ID;
+                    row.className = "flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-2.5 bg-white dark:bg-[#111111] hover:bg-zinc-50/80 dark:hover:bg-[#181818] transition-colors";
+
+                    const thumbHtml = this.buildAppIconMarkup(app, "w-9 h-9 rounded-lg text-sm", index >= 16);
+                    const idxLabel = String(index + 1).padStart(2, '0');
+
+                    row.innerHTML = `
+                        <button type="button" class="drag-handle min-h-[36px] min-w-[32px] flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-md shrink-0" title="Drag to reorder">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>
+                            </svg>
+                        </button>
+                        <span class="hidden sm:inline-block text-[11px] font-mono text-zinc-400 tabular-nums w-5 shrink-0">${idxLabel}</span>
+                        ${thumbHtml}
+                        <div class="flex-grow min-w-0">
+                            <h4 class="font-display font-semibold text-xs sm:text-sm text-zinc-900 dark:text-white break-words leading-snug">${escapeHtml(app.Name)}</h4>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <button
+                                type="button"
+                                class="btn-edit min-h-[36px] min-w-[36px] p-2 bg-zinc-100 dark:bg-[#1f1f1f] hover:bg-zinc-200 dark:hover:bg-[#2a2a2a] text-zinc-700 dark:text-zinc-200 rounded-lg transition-colors flex items-center justify-center"
+                                title="Edit Application"
+                                aria-label="Edit Application"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" class="w-4 h-4">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                                </svg>
+                            </button>
+                            <button
+                                type="button"
+                                class="btn-delete min-h-[36px] min-w-[36px] p-2 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 rounded-lg transition-colors flex items-center justify-center"
+                                title="Delete Application"
+                                aria-label="Delete Application"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" class="w-4 h-4">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                </svg>
+                            </button>
+                        </div>
+                    `;
+
+                    row.querySelector('.btn-edit').addEventListener('click', () => this.openAppModal(app));
+                    row.querySelector('.btn-delete').addEventListener('click', () => App.promptDeleteApp(app.ID, app.Name));
+
+                    fragment.appendChild(row);
+                }
+
+                list.appendChild(fragment);
+
+                if (sortableInstance) sortableInstance.destroy();
+                if (typeof Sortable !== 'undefined') {
+                    sortableInstance = new Sortable(list, {
+                        handle: '.drag-handle',
+                        animation: 150,
+                        ghostClass: 'sortable-ghost',
+                        dragClass: 'sortable-drag',
+                        onEnd: () => App.saveOrder()
+                    });
+                }
             },
 
             openAppModal(app = null) {
-                const modal = document.getElementById('app-modal');
-                document.getElementById('modal-alert').classList.add('hidden');
-                
+                const modal = DOM.get('app-modal');
+                DOM.get('modal-alert').classList.add('hidden');
+
                 IconStudio.reset();
 
                 if (app) {
-                    document.getElementById('modal-title').innerText = 'Edit WebApp';
-                    document.getElementById('modal-app-id').value = app.ID;
-                    document.getElementById('modal-app-name').value = app.Name;
-                    document.getElementById('modal-app-url').value = app.URL;
-                    document.getElementById('modal-app-iconurl').value = app.IconURL || '';
+                    DOM.get('modal-title').textContent = 'Edit Web Application';
+                    DOM.get('modal-app-id').value = app.ID;
+                    DOM.get('modal-app-name').value = app.Name || '';
+                    DOM.get('modal-app-url').value = app.URL || '';
+                    DOM.get('modal-app-iconurl').value = app.IconURL || '';
+                    DOM.get('modal-app-icondrive').value = IconStudio.extractDriveId(app.IconURL || '') || '';
                     this.setModalIconMode('url');
                 } else {
-                    document.getElementById('modal-title').innerText = 'Add WebApp';
-                    document.getElementById('modal-app-id').value = '';
-                    document.getElementById('modal-app-name').value = '';
-                    document.getElementById('modal-app-url').value = '';
+                    DOM.get('modal-title').textContent = 'Add Web Application';
+                    DOM.get('modal-app-id').value = '';
+                    DOM.get('modal-app-name').value = '';
+                    DOM.get('modal-app-url').value = '';
                     this.setModalIconMode('drive');
                 }
 
                 modal.classList.remove('hidden');
-                void modal.offsetWidth;
-                modal.classList.remove('opacity-0', 'pointer-events-none');
-                modal.firstElementChild.classList.remove('scale-95');
+                requestAnimationFrame(() => {
+                    modal.classList.remove('opacity-0', 'pointer-events-none');
+                    modal.firstElementChild.classList.remove('scale-95');
+                });
             },
 
             closeAppModal() {
-                const modal = document.getElementById('app-modal');
+                const modal = DOM.get('app-modal');
                 modal.classList.add('opacity-0', 'pointer-events-none');
                 modal.firstElementChild.classList.add('scale-95');
-                setTimeout(() => modal.classList.add('hidden'), 300);
+                setTimeout(() => modal.classList.add('hidden'), 150);
+            },
+
+            closeDeleteConfirm() {
+                const modal = DOM.get('confirm-delete-modal');
+                modal.classList.add('opacity-0', 'pointer-events-none');
+                modal.firstElementChild.classList.add('scale-95');
+                setTimeout(() => modal.classList.add('hidden'), 150);
+                pendingDeleteId = null;
             },
 
             setModalIconMode(mode) {
-                const driveCont = document.getElementById('icon-drive-container');
-                const urlCont = document.getElementById('icon-url-container');
-                const upCont = document.getElementById('icon-upload-container');
-                const tabDrive = document.getElementById('tab-drive');
-                const tabUrl = document.getElementById('tab-url');
-                const tabUp = document.getElementById('tab-upload');
-                
-                const activeClasses =['border-blue-600', 'text-blue-600', 'dark:text-blue-400'];
-                const inactiveClasses =['border-transparent', 'text-gray-500', 'hover:text-gray-700', 'dark:hover:text-gray-300'];
+                const driveCont = DOM.get('icon-drive-container');
+                const urlCont = DOM.get('icon-url-container');
+                const upCont = DOM.get('icon-upload-container');
+                const tabDrive = DOM.get('tab-drive');
+                const tabUrl = DOM.get('tab-url');
+                const tabUp = DOM.get('tab-upload');
 
-                [driveCont, urlCont, upCont].forEach(c => c.classList.add('hidden'));
-                [tabDrive, tabUrl, tabUp].forEach(t => {
-                    t.classList.remove(...activeClasses);
-                    t.classList.add(...inactiveClasses);
-                });
+                const activeCls = "min-h-[34px] py-1 px-2 text-xs font-semibold rounded-md transition-all whitespace-nowrap shrink-0 bg-white dark:bg-[#222222] text-zinc-900 dark:text-white shadow-sm";
+                const inactiveCls = "min-h-[34px] py-1 px-2 text-xs font-semibold rounded-md transition-all whitespace-nowrap shrink-0 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white";
+
+                driveCont.classList.add('hidden');
+                urlCont.classList.add('hidden');
+                upCont.classList.add('hidden');
+                tabDrive.className = inactiveCls;
+                tabUrl.className = inactiveCls;
+                tabUp.className = inactiveCls;
 
                 if (mode === 'drive') {
                     driveCont.classList.remove('hidden');
-                    tabDrive.classList.add(...activeClasses);
-                    tabDrive.classList.remove(...inactiveClasses);
+                    tabDrive.className = activeCls;
                 } else if (mode === 'url') {
                     urlCont.classList.remove('hidden');
-                    tabUrl.classList.add(...activeClasses);
-                    tabUrl.classList.remove(...inactiveClasses);
+                    tabUrl.className = activeCls;
                 } else {
                     upCont.classList.remove('hidden');
-                    tabUp.classList.add(...activeClasses);
-                    tabUp.classList.remove(...inactiveClasses);
+                    tabUp.className = activeCls;
                 }
             }
         };
 
-        // Bootstrap
-        document.addEventListener('DOMContentLoaded', () => App.init());
+        // Register Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(() => console.log("Service Worker Registered"))
+                    .catch(err => console.warn("SW Registration Warning:", err));
+            });
+        }
 
+        // Bootstrap Application
+        document.addEventListener('DOMContentLoaded', () => App.init());
     </script>
 </body>
 </html>
