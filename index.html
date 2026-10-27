@@ -1321,19 +1321,22 @@
             },
 
             async _executeRequest(action, payload = {}) {
-                const targetUrl = window.WERONE_CONFIG && window.WERONE_CONFIG.GAS_WEBAPP_URL;
+                const cfg = window.WERONE_CONFIG || {};
+                const targetUrl = cfg.GAS_WEBAPP_URL;
+                const activeEnv = cfg.APP_ENV || 'PROD';
                 if (!targetUrl) {
                     throw new Error("Action Required: Please configure GAS_WEBAPP_URL in /backend/config.js.");
                 }
 
-                if (['addApp', 'editApp', 'deleteApp', 'reorderApps', 'uploadIcon'].includes(action)) {
+                if (['addApp', 'editApp', 'deleteApp', 'reorderApps', 'uploadIcon', 'getDriveFiles'].includes(action)) {
                     payload.password = sessionPassword;
                 }
+                payload.env = activeEnv;
 
                 try {
                     const response = await fetch(targetUrl, {
                         method: 'POST',
-                        body: JSON.stringify({ action, payload }),
+                        body: JSON.stringify({ action, env: activeEnv, payload }),
                         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                         redirect: "follow"
                     });

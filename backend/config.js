@@ -16,7 +16,11 @@ const ENV_CONFIG = {
         SHORT_NAME: "WERONE Dev",
         CACHE_KEY: "hubAppsData_DEV",
         SHOW_DEV_BANNER: true,
-        DEV_BANNER_TEXT: "DEV"
+        DEV_BANNER_TEXT: "DEV",
+        sheetName: "WERONE_Database_DEV",
+        folderName: "WERONE_Icons_DEV",
+        sheetProp: "SHEET_ID_DEV",
+        folderProp: "FOLDER_ID_DEV"
     },
     PROD: {
         ID: "PROD",
@@ -25,15 +29,28 @@ const ENV_CONFIG = {
         SHORT_NAME: "WERONE",
         CACHE_KEY: "hubAppsData_PROD",
         SHOW_DEV_BANNER: false,
-        DEV_BANNER_TEXT: ""
+        DEV_BANNER_TEXT: "",
+        sheetName: "WERONE_Database",
+        folderName: "WERONE_Icons",
+        sheetProp: "SHEET_ID_PROD",
+        folderProp: "FOLDER_ID_PROD"
     }
 };
 
 const ACTIVE_CONFIG = ENV_CONFIG[APP_ENV] || ENV_CONFIG.PROD;
 const GAS_WEBAPP_URL = ACTIVE_CONFIG.GAS_WEBAPP_URL;
 
-window.WERONE_CONFIG = {
+const WERONE_EXPORT = {
     APP_ENV,
+    ENV_CONFIG,
     GAS_WEBAPP_URL,
     ...ACTIVE_CONFIG
 };
+
+if (typeof window !== "undefined") {
+    window.WERONE_CONFIG = WERONE_EXPORT;
+}
+if (typeof globalThis !== "undefined") {
+    globalThis.WERONE_CONFIG = WERONE_EXPORT;
+}
+
